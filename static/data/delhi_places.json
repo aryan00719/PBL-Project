@@ -1,0 +1,330 @@
+{
+    "culture": [
+        {
+            "name": "Red Fort",
+            "lat": 28.6562,
+            "lng": 77.2410,
+            "details": "Historic fort in Old Delhi, UNESCO World Heritage Site."
+        },
+        {
+            "name": "Qutub Minar",
+            "lat": 28.5245,
+            "lng": 77.1855,
+            "details": "Tallest brick minaret in the world."
+        },
+        {
+            "name": "India Gate",
+            "lat": 28.6129,
+            "lng": 77.2295,
+            "details": "War memorial dedicated to Indian soldiers."
+        },
+        {
+            "name": "Humayun’s Tomb",
+            "lat": 28.5933,
+            "lng": 77.2507,
+            "details": "Precursor to the Taj Mahal, Mughal architecture."
+        },
+        {
+            "name": "Lotus Temple",
+            "lat": 28.5535,
+            "lng": 77.2588,
+            "details": "Baháʼí House of Worship, shaped like a lotus."
+        },
+        {
+            "name": "Jama Masjid",
+            "lat": 28.6507,
+            "lng": 77.2334,
+            "details": "One of the largest mosques in India, built by Shah Jahan."
+        },
+        {
+            "name": "Raj Ghat",
+            "lat": 28.6444,
+            "lng": 77.2507,
+            "details": "Memorial to Mahatma Gandhi, located on the banks of the Yamuna."
+        }
+    ],
+    "food": [
+        {
+            "name": "Chandni Chowk Parathas",
+            "lat": 28.6564,
+            "lng": 77.2303,
+            "details": "Famous paratha street in Old Delhi."
+        },
+        {
+            "name": "Karim’s Jama Masjid",
+            "lat": 28.6507,
+            "lng": 77.2334,
+            "details": "Iconic Mughlai restaurant near Jama Masjid."
+        },
+        {
+            "name": "Rajinder Da Dhaba",
+            "lat": 28.5674,
+            "lng": 77.1911,
+            "details": "Popular street-style non-veg food joint in Safdarjung."
+        },
+        {
+            "name": "Saravana Bhavan",
+            "lat": 28.6327,
+            "lng": 77.2197,
+            "details": "Authentic South Indian vegetarian cuisine."
+        },
+        {
+            "name": "Bukhara, ITC Maurya",
+            "lat": 28.5954,
+            "lng": 77.1735,
+            "details": "Legendary fine-dining restaurant serving North-West Frontier cuisine."
+        },
+        {
+            "name": "Paranthe Wali Gali",
+            "lat": 28.6563,
+            "lng": 77.2301,
+            "details": "Famous street in Chandni Chowk known for various stuffed parathas."
+        },
+        {
+            "name": "Kuremal Mohan Lal Kulfi Wale",
+            "lat": 28.6567,
+            "lng": 77.2305,
+            "details": "Renowned for traditional and unique flavored kulfis."
+        }
+    ],
+    "adventure": [
+        {
+            "name": "Adventure Island, Rohini",
+            "lat": 28.7204,
+            "lng": 77.1137,
+            "details": "Amusement park with rides and water activities."
+        },
+        {
+            "name": "Worlds of Wonder, Noida",
+            "lat": 28.5663,
+            "lng": 77.3260,
+            "details": "Theme park and water park near Delhi."
+        },
+        {
+            "name": "Indian Mountaineering Foundation",
+            "lat": 28.5676,
+            "lng": 77.1992,
+            "details": "Rock climbing wall and mountaineering activities."
+        },
+        {
+            "name": "Garden of Five Senses",
+            "lat": 28.5205,
+            "lng": 77.1853,
+            "details": "Leisure space with adventure trails and cultural events."
+        },
+        {
+            "name": "Okhla Bird Sanctuary",
+            "lat": 28.5483,
+            "lng": 77.3149,
+            "details": "Bird watching and nature walks along Yamuna."
+        },
+        {
+            "name": "Sanjay Van",
+            "lat": 28.5917,
+            "lng": 77.1931,
+            "details": "Large forested area in South Delhi popular for trekking and nature walks."
+        },
+        {
+            "name": "Ridge Area",
+            "lat": 28.6512,
+            "lng": 77.2273,
+            "details": "Hilly forested area ideal for hiking and birdwatching."
+        }
+    ],
+    "shopping": [
+        {
+            "name": "Dilli Haat",
+            "lat": 28.5689,
+            "lng": 77.2076,
+            "details": "Craft bazaar with food stalls from all Indian states."
+        },
+        {
+            "name": "Sarojini Nagar Market",
+            "lat": 28.5756,
+            "lng": 77.1990,
+            "details": "Budget-friendly fashion street market."
+        },
+        {
+            "name": "Connaught Place",
+            "lat": 28.6320,
+            "lng": 77.2195,
+            "details": "Iconic shopping and business district with colonial architecture."
+        },
+        {
+            "name": "Chandni Chowk",
+            "lat": 28.6564,
+            "lng": 77.2303,
+            "details": "Historic market known for traditional goods and food."
+        },
+        {
+            "name": "Select Citywalk, Saket",
+            "lat": 28.5262,
+            "lng": 77.2219,
+            "details": "Modern shopping mall with international brands."
+        },
+        {
+            "name": "Lajpat Nagar Central Market",
+            "lat": 28.5721,
+            "lng": 77.2437,
+            "details": "Popular market for clothes, accessories, and street food."
+        },
+        {
+            "name": "Janpath Market",
+            "lat": 28.6123,
+            "lng": 77.2090,
+            "details": "Famous for handicrafts, souvenirs, and ethnic wear."
+        }
+    ],
+    "nature": [
+        {
+            "name": "Lodhi Gardens",
+            "lat": 28.5933,
+            "lng": 77.2197,
+            "details": "Beautiful park with historic tombs and lush greenery."
+        },
+        {
+            "name": "Deer Park",
+            "lat": 28.5974,
+            "lng": 77.2069,
+            "details": "Popular park with deer enclosures and walking paths."
+        },
+        {
+            "name": "Nehru Park",
+            "lat": 28.5915,
+            "lng": 77.2200,
+            "details": "Large urban park known for cultural events and open-air concerts."
+        },
+        {
+            "name": "Yamuna Biodiversity Park",
+            "lat": 28.6500,
+            "lng": 77.2500,
+            "details": "Protected area conserving native flora and fauna of Yamuna."
+        },
+        {
+            "name": "Sanjay Lake",
+            "lat": 28.6503,
+            "lng": 77.2600,
+            "details": "Artificial lake with boating and picnic spots."
+        },
+        {
+            "name": "Aravalli Biodiversity Park",
+            "lat": 28.5520,
+            "lng": 77.2140,
+            "details": "Hilly forest park with walking trails and diverse plant life."
+        }
+    ],
+    "museums": [
+        {
+            "name": "National Museum",
+            "lat": 28.6128,
+            "lng": 77.2197,
+            "details": "Extensive collection of Indian art and artifacts."
+        },
+        {
+            "name": "Gandhi Museum",
+            "lat": 28.6444,
+            "lng": 77.2507,
+            "details": "Museum dedicated to the life and legacy of Mahatma Gandhi."
+        },
+        {
+            "name": "Crafts Museum",
+            "lat": 28.6120,
+            "lng": 77.2080,
+            "details": "Showcases traditional Indian handicrafts and textiles."
+        },
+        {
+            "name": "Rail Museum",
+            "lat": 28.6275,
+            "lng": 77.2090,
+            "details": "Exhibits historic locomotives and railway memorabilia."
+        },
+        {
+            "name": "Indira Gandhi Memorial Museum",
+            "lat": 28.6145,
+            "lng": 77.2088,
+            "details": "Museum in the former residence of Indira Gandhi."
+        },
+        {
+            "name": "Nehru Memorial Museum & Library",
+            "lat": 28.6123,
+            "lng": 77.2089,
+            "details": "Dedicated to India's first Prime Minister, Jawaharlal Nehru."
+        }
+    ],
+    "spiritual": [
+        {
+            "name": "Akshardham Temple",
+            "lat": 28.6127,
+            "lng": 77.2773,
+            "details": "Massive Hindu temple complex with exhibitions and gardens."
+        },
+        {
+            "name": "Birla Mandir",
+            "lat": 28.6142,
+            "lng": 77.2167,
+            "details": "Elegant Hindu temple dedicated to Lord Vishnu and Goddess Lakshmi."
+        },
+        {
+            "name": "Jama Masjid",
+            "lat": 28.6507,
+            "lng": 77.2334,
+            "details": "One of the largest mosques in India."
+        },
+        {
+            "name": "Gurudwara Bangla Sahib",
+            "lat": 28.6325,
+            "lng": 77.2172,
+            "details": "Prominent Sikh house of worship with a sacred pond."
+        },
+        {
+            "name": "ISKCON Temple",
+            "lat": 28.6250,
+            "lng": 77.2019,
+            "details": "Temple dedicated to Lord Krishna with cultural programs."
+        },
+        {
+            "name": "Chhatarpur Temple",
+            "lat": 28.5220,
+            "lng": 77.2160,
+            "details": "One of the largest temple complexes in India."
+        }
+    ],
+    "nightlife": [
+        {
+            "name": "Hauz Khas Village",
+            "lat": 28.5495,
+            "lng": 77.2007,
+            "details": "Trendy area with bars, cafes, and live music venues."
+        },
+        {
+            "name": "Connaught Place",
+            "lat": 28.6320,
+            "lng": 77.2195,
+            "details": "Bustling commercial hub with pubs and restaurants."
+        },
+        {
+            "name": "Cyber Hub, Gurugram",
+            "lat": 28.4946,
+            "lng": 77.0879,
+            "details": "Modern nightlife destination with clubs and eateries."
+        },
+        {
+            "name": "Janpath and Khan Market",
+            "lat": 28.6123,
+            "lng": 77.2090,
+            "details": "Upscale area with chic bars and lounges."
+        },
+        {
+            "name": "Saket Select Citywalk",
+            "lat": 28.5262,
+            "lng": 77.2219,
+            "details": "Shopping mall with multiplex and dining options."
+        },
+        {
+            "name": "The Piano Man Jazz Club",
+            "lat": 28.5770,
+            "lng": 77.2160,
+            "details": "Live jazz performances and cocktails in a cozy setting."
+        }
+    ]
+}
