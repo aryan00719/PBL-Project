@@ -1,2 +1,3 @@
 cache/
 graph_cache/
+.env
