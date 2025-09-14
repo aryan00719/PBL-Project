@@ -53,6 +53,7 @@ const geocodePlace = async (placeName) => {
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   hideLoader();
+  loadMockItinerary();
 });
 
 // Function to initialize the Leaflet map
@@ -598,28 +599,70 @@ async function submitAIPrompt() {
 
       const aiItinerarySection = document.getElementById('ai-itinerary-section');
       const aiItineraryCards = document.getElementById('ai-itinerary-cards');
+      const itineraryList = aiItineraryCards; // For event binding, use same as aiItineraryCards
 
       if (aiItinerarySection && aiItineraryCards) {
-        if (data.itinerary && data.itinerary.length > 0) {
-          let itineraryHTML = '';
-          data.itinerary.forEach((dayObj, index) => {
-            itineraryHTML += `
-              <div class="itinerary-card">
-                <div class="itinerary-day">${dayObj.day || `Day ${index + 1}`}</div>
-                <div class="itinerary-activities">
-                  ${Array.isArray(dayObj.activities) ? dayObj.activities.map(activity => `<div class="itinerary-activity">${activity}</div>`).join('') : ''}
-                </div>
+        // --- Collapsible mock itinerary for "Ask AI" section ---
+        // Mock data for demonstration purposes
+        const mockItinerary = [
+          {
+            day: "Day 1",
+            activities: ["Red Fort", "Chandni Chowk"]
+          },
+          {
+            day: "Day 2",
+            activities: ["Qutub Minar", "Lotus Temple"]
+          }
+        ];
+
+        let itineraryHTML = '';
+        mockItinerary.forEach((dayObj, index) => {
+          itineraryHTML += `
+            <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
+              <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">
+                ${dayObj.day}
+              </button>
+              <div class="itinerary-day-details" style="display:none;padding-left:12px;">
+                ${dayObj.activities.map(activity => `
+                  <div class="itinerary-collapsible-location" style="margin:6px 0;">
+                    <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
+                      ${activity}
+                    </button>
+                    <div class="itinerary-location-details" style="display:none;padding-left:10px;">
+                      <div style="margin:4px 0;"><b>Description:</b> A popular historical site in Delhi.</div>
+                      <img src="https://placehold.co/200x120?text=${encodeURIComponent(activity)}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
+                      <div><b>Timings:</b> 9:00 AM - 5:00 PM</div>
+                      <div><b>Ticket Price:</b> ₹200</div>
+                    </div>
+                  </div>
+                `).join('')}
               </div>
-            `;
-          });
-          aiItineraryCards.innerHTML = itineraryHTML;
-          aiItinerarySection.style.display = 'block';
-        } else {
-          aiItineraryCards.innerHTML = '<li>No AI itinerary available.</li>';
-          aiItinerarySection.style.display = 'block';
-        }
-      } else {
-        console.warn('AI itinerary section or list missing from DOM.');
+            </div>
+          `;
+        });
+
+        aiItineraryCards.innerHTML = itineraryHTML;
+        aiItinerarySection.style.display = 'block';
+
+        aiItineraryCards.addEventListener('click', function (e) {
+          const dayToggle = e.target.closest('.itinerary-day-toggle');
+          if (dayToggle) {
+            const details = dayToggle.parentElement.querySelector('.itinerary-day-details');
+            if (details) {
+              details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+            }
+            return;
+          }
+
+          const locToggle = e.target.closest('.itinerary-location-toggle');
+          if (locToggle) {
+            e.stopPropagation();
+            const details = locToggle.parentElement.querySelector('.itinerary-location-details');
+            if (details) {
+              details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+            }
+          }
+        });
       }
 
       // Final formatted dump for debugging
@@ -799,7 +842,161 @@ async function fetchItinerary(places) {
   }
   hideLoader();
 }
+
 // ---- End of itinerary/map/collapsible enhancements ----
+
+// ---- Mock Itinerary Functionality ----
+function loadMockItinerary() {
+  // 1. Clear existing markers
+  if (window.itineraryMarkers) {
+    window.itineraryMarkers.forEach(m => map.removeLayer(m));
+  }
+  window.itineraryMarkers = [];
+
+  // 2. Create a mock itinerary data structure with days and locations
+  const mockItinerary = [
+    {
+      day: "Day 1: Arrival & Exploring Old Delhi",
+      locations: [
+        {
+          name: "Red Fort",
+          lat: 28.6562,
+          lng: 77.2410,
+          photo: "https://upload.wikimedia.org/wikipedia/commons/6/6d/Red_Fort_in_Delhi_03-2016_img3.jpg",
+          time: "9:00 AM - 12:00 PM",
+          ticket_price: "₹500",
+          description: "A historic fort in Old Delhi, served as the main residence of Mughal Emperors."
+        },
+        {
+          name: "Chandni Chowk",
+          lat: 28.6564,
+          lng: 77.2303,
+          photo: "https://upload.wikimedia.org/wikipedia/commons/8/8e/Chandni_Chowk_Market_Delhi_2016.jpg",
+          time: "12:30 PM - 2:00 PM",
+          ticket_price: "Free",
+          description: "Bustling market street famous for food, shopping and vibrant atmosphere."
+        }
+      ]
+    },
+    {
+      day: "Day 2: Monuments & Spiritual Sites",
+      locations: [
+        {
+          name: "Qutub Minar",
+          lat: 28.5245,
+          lng: 77.1855,
+          photo: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Qutb_Minar_-_Delhi.jpg",
+          time: "10:00 AM - 12:00 PM",
+          ticket_price: "₹600",
+          description: "A UNESCO World Heritage site, tallest brick minaret in the world."
+        },
+        {
+          name: "Lotus Temple",
+          lat: 28.5535,
+          lng: 77.2588,
+          photo: "https://upload.wikimedia.org/wikipedia/commons/1/1e/LOTUS_TEMPLE_DELHI.jpg",
+          time: "2:00 PM - 4:00 PM",
+          ticket_price: "Free",
+          description: "Famous Baháʼí House of Worship known for its flowerlike shape."
+        }
+      ]
+    }
+  ];
+
+  // 3. Populate the itinerary list with collapsible day sections and location details
+  const itinerarySection = document.getElementById('itinerary-section');
+  const itineraryList = document.getElementById('itinerary-list');
+  if (itinerarySection && itineraryList) {
+    let itineraryHTML = '';
+    mockItinerary.forEach((day, dayIdx) => {
+      const dayLabel = day.day || `Day ${dayIdx + 1}`;
+      itineraryHTML += `
+        <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
+          <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">${dayLabel}</button>
+          <div class="itinerary-day-details" style="display:none;padding-left:12px;">
+            ${Array.isArray(day.locations) ? day.locations.map((loc, locIdx) => `
+              <div class="itinerary-collapsible-location" style="margin:6px 0;">
+                <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
+                  ${loc.name || `Place ${locIdx + 1}`}
+                </button>
+                <div class="itinerary-location-details" style="display:none;padding-left:10px;">
+                  <div style="margin:4px 0;"><b>Description:</b> ${loc.description || 'A wonderful place to visit.'}</div>
+                  <img src="${loc.photo || 'https://placehold.co/200x120?text=Photo'}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
+                  <div><b>Timings:</b> ${loc.time || loc.visit_time || '10:00 AM - 5:00 PM'}</div>
+                  <div><b>Ticket Price:</b> ${loc.ticket_price !== undefined ? loc.ticket_price : '₹200'}</div>
+                </div>
+              </div>
+            `).join('') : ''}
+          </div>
+        </div>
+      `;
+    });
+    itineraryList.innerHTML = itineraryHTML;
+    itinerarySection.style.display = 'block';
+    setTimeout(() => {
+      itineraryList.querySelectorAll('.itinerary-day-toggle').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const details = this.parentElement.querySelector('.itinerary-day-details');
+          if (details) {
+            details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+          }
+        });
+      });
+      itineraryList.querySelectorAll('.itinerary-location-toggle').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const details = this.parentElement.querySelector('.itinerary-location-details');
+          if (details) {
+            details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+          }
+        });
+      });
+    }, 0);
+  }
+
+  // 4. Pin the locations on the map with markers showing name, photo, timings, ticket price, and description in a popup
+  let allLocations = [];
+  mockItinerary.forEach(day => {
+    if (Array.isArray(day.locations)) {
+      allLocations = allLocations.concat(day.locations);
+    }
+  });
+  for (const loc of allLocations) {
+    let lat = loc.lat, lng = loc.lng;
+    if (typeof lat !== 'number' || typeof lng !== 'number') continue;
+    // Check for duplicate markers by lat/lng
+    const latLngKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    if (window.itineraryMarkers.some(m => {
+      const pos = m.getLatLng();
+      return `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` === latLngKey;
+    })) {
+      continue;
+    }
+    let icon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41]
+    });
+    const name = loc.name || 'Place';
+    const photo = loc.photo || 'https://placehold.co/200x120?text=Photo';
+    const time = loc.time || loc.visit_time || '10:00 AM - 5:00 PM';
+    const price = (loc.ticket_price !== undefined) ? loc.ticket_price : '₹200';
+    const desc = loc.description || 'A wonderful place to visit.';
+    const popupContent = `
+      <div style="font-weight:bold;font-size:1.1em;margin-bottom:4px;">${name}</div>
+      <img src="${photo}" alt="photo" style="width:200px;height:120px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
+      <div><b>Timings:</b> ${time}</div>
+      <div><b>Ticket Price:</b> ${price}</div>
+      <div style="margin-top:4px;">${desc}</div>
+    `;
+    const marker = L.marker([lat, lng], { icon }).addTo(map).bindPopup(popupContent);
+    window.itineraryMarkers.push(marker);
+  }
+  if (window.itineraryMarkers.length > 0) {
+    const group = new L.featureGroup(window.itineraryMarkers);
+    map.fitBounds(group.getBounds().pad(0.18));
+  }
+}
 
 function applyTheme(isDark) {
   const html = document.documentElement;

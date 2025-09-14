@@ -62,57 +62,197 @@ def normalize_itinerary(itinerary_raw):
     return normalized
 
 
-def geocode_place(place_name, city=None):
-    """Try to geocode a place name, using cache and fallback options."""
+def geocode_place(place_name):
     if place_name.lower() in geocode_cache:
         return geocode_cache[place_name.lower()]
 
-    url = "https://nominatim.openstreetmap.org/search"
+    url = f"https://nominatim.openstreetmap.org/search"
     params = {
         'q': place_name,
         'format': 'json',
         'limit': 1
     }
     headers = {'User-Agent': 'TravelMapApp/1.0'}
-
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response = requests.get(url, params=params, headers=headers)
         data = response.json()
-
         if data:
+            # Conditional override for known incorrect results
+            if place_name.lower() == "the residency" and "malaysia" in data[0].get("display_name", "").lower():
+                logging.warning(f"Overriding bad geocode for '{place_name}' from Malaysia to Lucknow coordinates")
+                coords = {
+                    "lat": 26.8605,
+                    "lng": 80.9466
+                }
+                geocode_cache[place_name.lower()] = coords
+                return coords
+            # Additional override for suspicious Malaysia coordinates
+            elif (
+                abs(float(data[0]['lat']) - 5.4156) < 0.01 and 
+                abs(float(data[0]['lon']) - 100.3072) < 0.01
+            ):
+                logging.warning(f"Overriding suspicious coordinates for '{place_name}' from Malaysia to Lucknow coordinates")
+                coords = {
+                    "lat": 26.8605,
+                    "lng": 80.9466
+                }
+                geocode_cache[place_name.lower()] = coords
+                return coords
+            # Override for known bad coordinates
+            known_overrides = {
+                "dilkusha kothi": {"lat": 26.8381, "lng": 80.9910},
+                "rumi darwaza": {"lat": 26.8696, "lng": 80.9134},
+                "vijay chowk": {"lat": 28.6145, "lng": 77.2038}
+            }
+            if place_name.lower() in known_overrides:
+                logging.warning(f"Using manual override for '{place_name}'")
+                coords = known_overrides[place_name.lower()]
+                geocode_cache[place_name.lower()] = coords
+                return coords
             coords = {
                 "lat": float(data[0]['lat']),
                 "lng": float(data[0]['lon'])
             }
-            geocode_cache[place_name.lower()] = coords
+            geocode_cache[place_name.lower()] = coords  # Cache the result
             return coords
         else:
-            # Try fallback based on city context
-            if city and city.lower() in CITY_LANDMARK_FALLBACK:
-                fallback_landmark = CITY_LANDMARK_FALLBACK[city.lower()]
-                logging.warning(f"Geocode failed for '{place_name}', using city fallback '{fallback_landmark}'")
-                return geocode_place(fallback_landmark)
-
-            # Attempt removing parts after commas or hyphens
-            simple_name = place_name.split(",")[0].split("-")[0].strip()
-            if simple_name.lower() != place_name.lower():
-                logging.info(f"Retrying geocode for simplified name '{simple_name}'")
-                return geocode_place(simple_name, city)
-
-            logging.error(f"Geocode failed for '{place_name}' and no fallback available")
+            # Override for known bad coordinates (fallback if geocoding returns nothing)
+            known_overrides = {
+                "dilkusha kothi": {"lat": 26.8381, "lng": 80.9910},
+                "rumi darwaza": {"lat": 26.8696, "lng": 80.9134},
+                "vijay chowk": {"lat": 28.6145, "lng": 77.2038}
+            }
+            if place_name.lower() in known_overrides:
+                logging.warning(f"Using manual override for '{place_name}' (no geocode result)")
+                coords = known_overrides[place_name.lower()]
+                geocode_cache[place_name.lower()] = coords
+                return coords
+            logging.warning(f"No geocode result for '{place_name}'. Attempting fallback...")
+            fallback_coords = fallback_geocode(place_name)
+            if fallback_coords:
+                logging.info(f"Fallback geocode successful for '{place_name}' -> {fallback_coords}")
+                geocode_cache[place_name.lower()] = fallback_coords
+                return fallback_coords
             return None
-
     except Exception as e:
-        logging.error(f"Exception during geocoding '{place_name}': {e}")
-
-        # Fallback: use landmark from city if possible
-        if city and city.lower() in CITY_LANDMARK_FALLBACK:
-            fallback_landmark = CITY_LANDMARK_FALLBACK[city.lower()]
-            logging.warning(f"Exception in geocode. Using city fallback '{fallback_landmark}' for '{place_name}'")
-            return geocode_place(fallback_landmark)
-
-        logging.error(f"No fallback available for '{place_name}'")
+        logging.error(f"Geocoding failed for {place_name}: {e}")
+        # Attempt override on error
+        known_overrides = {
+            "dilkusha kothi": {"lat": 26.8381, "lng": 80.9910},
+            "rumi darwaza": {"lat": 26.8696, "lng": 80.9134},
+            "vijay chowk": {"lat": 28.6145, "lng": 77.2038}
+        }
+        if place_name.lower() in known_overrides:
+            logging.warning(f"Using manual override for '{place_name}' (exception in geocode)")
+            coords = known_overrides[place_name.lower()]
+            geocode_cache[place_name.lower()] = coords
+            return coords
+        logging.warning(f"Exception during geocode for '{place_name}'. Attempting fallback...")
+        fallback_coords = fallback_geocode(place_name)
+        if fallback_coords:
+            logging.info(f"Fallback geocode successful for '{place_name}' -> {fallback_coords}")
+            geocode_cache[place_name.lower()] = fallback_coords
+            return fallback_coords
         return None
+
+
+# Wikipedia API integration for place details
+def get_place_details(place_name, lat, lng):
+    """
+    Fetch a description and thumbnail for a place from Wikipedia API.
+    Returns a dict with 'description' and 'thumbnail' keys.
+    """
+    try:
+        # Step 1: Search for the most relevant Wikipedia page
+        search_url = "https://en.wikipedia.org/w/api.php"
+        search_params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": place_name,
+            "format": "json",
+            "srlimit": 1
+        }
+        search_resp = requests.get(search_url, params=search_params, timeout=5)
+        search_data = search_resp.json()
+        if not search_data.get("query", {}).get("search"):
+            return {"description": "No description available.", "thumbnail": None}
+        page_title = search_data["query"]["search"][0]["title"]
+
+        # Step 2: Get summary and thumbnail for the found page
+        summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{page_title.replace(' ', '_')}"
+        summary_resp = requests.get(summary_url, timeout=5)
+        if summary_resp.status_code != 200:
+            return {"description": "No description available.", "thumbnail": None}
+        summary_data = summary_resp.json()
+        desc = summary_data.get("extract", "No description available.")
+        thumb = summary_data.get("thumbnail", {}).get("source")
+        return {"description": desc, "thumbnail": thumb}
+    except Exception as e:
+        logging.warning(f"Wikipedia API error for '{place_name}': {e}")
+        return {"description": "No description available.", "thumbnail": None}
+
+
+# Additional fallback logic for unresolved places
+def fallback_geocode(place_name):
+    # Try a few simplifications and known landmarks
+    simplified_names = [
+        place_name.lower().split(",")[0].strip(),
+        re.sub(r"\s*-\s*", " ", place_name.lower()),
+        place_name.lower().replace("temple", "").replace("park", "").strip()
+    ]
+    known_fallbacks = {
+        "mumbai gateway": {"lat": 18.9220, "lng": 72.8347},
+        "gateway of india": {"lat": 18.9219841, "lng": 72.8346543},
+        "taj mahal": {"lat": 27.1751, "lng": 78.0421},
+        "kerala backwaters": {"lat": 9.7655, "lng": 76.6413},
+        "ooty lake": {"lat": 11.4125, "lng": 76.6935},
+        "sim's park": {"lat": 11.3531, "lng": 76.8142},
+        "mysore palace": {"lat": 12.3051, "lng": 76.6551},
+        "marina beach": {"lat": 13.0500, "lng": 80.2824},
+        "india gate": {"lat": 28.6129, "lng": 77.2295},
+        "charminar": {"lat": 17.3616, "lng": 78.4747},
+        "victoria memorial": {"lat": 22.5448, "lng": 88.3426},
+        "amber fort": {"lat": 26.9855, "lng": 75.8513},
+        "city palace": {"lat": 26.9262, "lng": 75.8238},
+        "jal mahal": {"lat": 26.9539, "lng": 75.8466},
+        "jantar mantar": {"lat": 26.9258, "lng": 75.8236},
+        "albert hall museum": {"lat": 26.9118, "lng": 75.8195},
+        "lodhi garden": {"lat": 28.5916, "lng": 77.2195},
+        "connaught place": {"lat": 28.6315, "lng": 77.2167},
+        "raj ghat": {"lat": 28.6400, "lng": 77.2495},
+        "akshardham": {"lat": 28.6127, "lng": 77.2773},
+        "akshardham temple": {"lat": 28.6127, "lng": 77.2773},
+        "lotus temple": {"lat": 28.5535, "lng": 77.2588},
+        "humayun's tomb": {"lat": 28.5933, "lng": 77.2507},
+        "chandni chowk": {"lat": 28.6564, "lng": 77.2303},
+        "red fort": {"lat": 28.6562, "lng": 77.2410},
+        "qutub minar": {"lat": 28.5245, "lng": 77.1855},
+        "sim s park": {"lat": 11.3531, "lng": 76.8142},
+        "mysore": {"lat": 12.2958, "lng": 76.6394},
+        "coimbatore": {"lat": 11.0168, "lng": 76.9558},
+        "ooty": {"lat": 11.4064, "lng": 76.6932},
+        "coonoor": {"lat": 11.3544, "lng": 76.7956},
+        "marudhamalai": {"lat": 11.0840, "lng": 76.8565},
+        "marudhamalai temple": {"lat": 11.0840, "lng": 76.8565},
+        "jaipur": {"lat": 26.9124, "lng": 75.7873},
+        "delhi": {"lat": 28.6139, "lng": 77.2090},
+        "lucknow": {"lat": 26.8467, "lng": 80.9462},
+        "the residency": {"lat": 26.8605, "lng": 80.9466},
+    }
+    # Try exact match first
+    for name in simplified_names + [place_name.lower()]:
+        if name in known_fallbacks:
+            logging.info(f"Fallback matched '{place_name}' as '{name}'")
+            return known_fallbacks[name]
+    # Try further simplification: remove words like 'the', 'of', etc.
+    further = re.sub(r'\b(the|of|in|at|on|to|a|an|temple|park|palace|museum|fort|gate|beach|lake|garden|chowk|bazaar)\b', '', place_name.lower())
+    further = re.sub(r"\s+", " ", further).strip()
+    if further in known_fallbacks:
+        logging.info(f"Further fallback matched '{place_name}' as '{further}'")
+        return known_fallbacks[further]
+    logging.debug(f"No fallback match found for '{place_name}'")
+    return None
+
 
 import shutil
 
@@ -480,7 +620,7 @@ User's request: '{prompt}'
             matches = get_close_matches(name, place_db.keys(), n=1, cutoff=0.8)
             return matches[0] if matches else None
 
-        # Build selected_places strictly from AI's "places" list for routing
+        # Build selected_places strictly from AI's "places" list for routing, and fetch Wikipedia details
         selected_places = []
         for place_name in places:
             coords = place_db.get(city, {}).get(place_name)
@@ -493,11 +633,12 @@ User's request: '{prompt}'
                     coords = geocode_place(place_name)
                 logging.debug(f"Geocoded '{place_name}' to {coords}")
             if coords:
+                details = get_place_details(place_name, coords["lat"], coords["lng"])
                 selected_places.append({
                     "name": place_name,
                     "lat": coords["lat"],
                     "lng": coords["lng"],
-                    "details": ""
+                    "details": details
                 })
             else:
                 logging.warning(f"Could not resolve coordinates for {place_name}")
@@ -508,11 +649,12 @@ User's request: '{prompt}'
             for fallback_place in places:
                 coords = geocode_place(fallback_place)
                 if coords:
+                    details = get_place_details(fallback_place, coords["lat"], coords["lng"])
                     selected_places.append({
                         "name": fallback_place,
                         "lat": coords["lat"],
                         "lng": coords["lng"],
-                        "details": "Final fallback geocode"
+                        "details": details
                     })
                     logging.info(f"✅ Final fallback geocode success: {fallback_place} -> {coords}")
                 else:
@@ -549,11 +691,12 @@ User's request: '{prompt}'
                 food_list = ["Chole Bhature", "Paratha"]
 
         if not selected_places:
+            details = get_place_details("Red Fort", 28.6562, 77.2410)
             selected_places = [{
                 "name": "Red Fort",
                 "lat": 28.6562,
                 "lng": 77.2410,
-                "details": "Default fallback"
+                "details": details
             }]
 
         logging.warning(f"🧭 Final selected_places = {selected_places}")
