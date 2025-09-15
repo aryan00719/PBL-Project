@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 import logging
 import re
-#from openai import OpenAI
 from dotenv import load_dotenv
 import json
 import requests
@@ -157,11 +156,31 @@ def geocode_place(place_name):
 
 
 # Wikipedia API integration for place details
-def get_place_details(place_name, lat, lng):
+def get_place_details(place_name, lat, lng, max_retries=3, backoff_factor=1.5):
     """
     Fetch a description and thumbnail for a place from Wikipedia API.
     Returns a dict with 'description' and 'thumbnail' keys.
+    Adds retry logic with exponential backoff for network resilience.
+    Includes a User-Agent header to avoid 403 errors.
     """
+    WIKI_HEADERS = {'User-Agent': 'TravelMapApp/1.0'}
+    def _request_with_retries(url, params=None, timeout=5):
+        attempt = 0
+        delay = 1.0
+        while attempt < max_retries:
+            try:
+                resp = requests.get(url, params=params, timeout=timeout, headers=WIKI_HEADERS)
+                resp.raise_for_status()
+                return resp
+            except Exception as e:
+                attempt += 1
+                if attempt == max_retries:
+                    raise
+                logging.warning(f"Wikipedia API request failed (attempt {attempt}/{max_retries}): {e}. Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+                delay *= backoff_factor
+        raise RuntimeError("Wikipedia API request failed after retries")
+
     try:
         # Step 1: Search for the most relevant Wikipedia page
         search_url = "https://en.wikipedia.org/w/api.php"
@@ -172,7 +191,7 @@ def get_place_details(place_name, lat, lng):
             "format": "json",
             "srlimit": 1
         }
-        search_resp = requests.get(search_url, params=search_params, timeout=5)
+        search_resp = _request_with_retries(search_url, params=search_params, timeout=5)
         search_data = search_resp.json()
         if not search_data.get("query", {}).get("search"):
             return {"description": "No description available.", "thumbnail": None}
@@ -180,7 +199,7 @@ def get_place_details(place_name, lat, lng):
 
         # Step 2: Get summary and thumbnail for the found page
         summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{page_title.replace(' ', '_')}"
-        summary_resp = requests.get(summary_url, timeout=5)
+        summary_resp = _request_with_retries(summary_url, timeout=5)
         if summary_resp.status_code != 200:
             return {"description": "No description available.", "thumbnail": None}
         summary_data = summary_resp.json()
@@ -510,17 +529,8 @@ def ai_route():
         if match:
             requested_days = int(match.group(1))
             logging.info(f"[ai_route] Detected user-requested trip length: {requested_days} days (from prompt)")
-        # client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        # response = client.chat.completions.create(
-        #     model="gpt-3.5-turbo",
-        #     messages=[
-        #         {"role": "system", "content": "You are a travel assistant. Extract city, places to visit, and food preferences from user's prompt. Return in JSON format with keys: city, places (list), food (list)."},
-        #         {"role": "user", "content": prompt}
-        #     ],
-        #     temperature=0.2
-        # )
-        # content = response.choices[0].message.content
 
+        # Refined Gemini prompt: request explicit place names, not categories
         content = get_gemini_response(
             f"""From the user's travel request below, extract JSON structured like this:
 
@@ -547,6 +557,8 @@ def ai_route():
         }}
     ]
 }}
+
+IMPORTANT: For the 'places' array, list only specific place names (such as monuments, parks, palaces, lakes, or attractions), NOT categories like "Hill Stations", "Temples", or "Museums". Each place should be a real, visitable location. Do not use generic types.
 
 Ensure to cover ALL places over multiple days, with 2-4 activities per day. Respond ONLY with the pure JSON, no explanations.
 
@@ -577,7 +589,11 @@ User's request: '{prompt}'
             parsed["city"] = "delhi"
             parsed["places"] = ["Red Fort", "India Gate", "Qutub Minar"]
 
-        city = parsed.get("city", "delhi").lower()
+        city = parsed.get("city", "delhi")
+        # Fallback for empty city names
+        if not city or not str(city).strip():
+            city = "delhi"
+        city = city.lower()
         places = parsed.get("places", [])
         # Fallback: auto-inject a main landmark if places is empty and city is known
         if not places and city in CITY_LANDMARK_FALLBACK:

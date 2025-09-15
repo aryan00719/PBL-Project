@@ -1331,3 +1331,176 @@ html.dark .itinerary-activity:hover {
   background: var(--primary-color);
   color: #fff;
 }
+
+/* Enhanced Itinerary Styling */
+.itinerary-day-header {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(0, 116, 217, 0.1));
+  border-bottom: 1px solid var(--border-light);
+  padding: 14px 20px;
+  font-weight: bold;
+  font-size: 1.2rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.itinerary-day-header:hover {
+  background: linear-gradient(90deg, rgba(0, 116, 217, 0.1), rgba(0, 116, 217, 0.2));
+  color: var(--primary-hover);
+  box-shadow: 0 4px 12px rgba(0, 116, 217, 0.2);
+}
+
+.itinerary-activities {
+  padding-left: 20px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+
+.itinerary-activities.expanded {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.itinerary-activity {
+  padding: 8px;
+  margin: 6px 0;
+  border-left: 4px solid var(--accent-color);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.itinerary-activity:hover {
+  background-color: rgba(0, 116, 217, 0.1);
+  transform: scale(1.02);
+}
+
+.itinerary-location-details {
+  background: var(--card-bg);
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.itinerary-location-toggle {
+  font-size: 1rem;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--secondary-color);
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.itinerary-location-toggle:hover {
+  background: var(--secondary-hover);
+  color: var(--primary-color);
+}
+
+/* Dark Mode Adjustments */
+html.dark .itinerary-day-header:hover {
+  background: rgba(74, 168, 255, 0.15);
+  color: var(--accent-color);
+}
+
+html.dark .itinerary-activity:hover {
+  background-color: rgba(74, 168, 255, 0.15);
+  color: #fff;
+}
+
+html.dark .itinerary-location-details {
+  background: #2c2f38;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ====== Enhanced Itinerary Section ====== */
+.itinerary-section {
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: 20px;
+  margin-bottom: 20px;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+.itinerary-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.itinerary-card {
+  background: var(--secondary-color);
+  border-radius: var(--input-radius);
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.itinerary-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.itinerary-card h4 {
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+  color: var(--primary-color);
+}
+
+.itinerary-card p {
+  margin: 5px 0;
+  font-size: 0.95rem;
+  color: var(--light-text);
+}
+
+/* ====== Enhanced Place Popup ====== */
+.place-popup {
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: 15px;
+  max-width: 250px;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+.place-popup h4 {
+  margin-top: 0;
+  font-size: 1.05rem;
+  color: var(--primary-color);
+}
+
+.place-popup p {
+  margin: 6px 0;
+  font-size: 0.92rem;
+  color: var(--light-text);
+}
+
+.place-popup img {
+  width: 100%;
+  border-radius: var(--input-radius);
+  margin-bottom: 10px;
+}
+
+/* ====== Dark Mode Adjustments ====== */
+html.dark .itinerary-section {
+  background: #23272f;
+  color: var(--dark-text);
+}
+
+html.dark .itinerary-card {
+  background: #2c2f38;
+  color: var(--dark-text);
+}
+
+html.dark .place-popup {
+  background: #2c2f38;
+  color: var(--dark-text);
+}
+
+html.dark .itinerary-card h4,
+html.dark .place-popup h4 {
+  color: var(--accent-color);
+}

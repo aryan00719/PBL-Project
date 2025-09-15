@@ -602,67 +602,84 @@ async function submitAIPrompt() {
       const itineraryList = aiItineraryCards; // For event binding, use same as aiItineraryCards
 
       if (aiItinerarySection && aiItineraryCards) {
-        // --- Collapsible mock itinerary for "Ask AI" section ---
-        // Mock data for demonstration purposes
-        const mockItinerary = [
-          {
-            day: "Day 1",
-            activities: ["Red Fort", "Chandni Chowk"]
-          },
-          {
-            day: "Day 2",
-            activities: ["Qutub Minar", "Lotus Temple"]
-          }
-        ];
-
-        let itineraryHTML = '';
-        mockItinerary.forEach((dayObj, index) => {
-          itineraryHTML += `
-            <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
-              <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">
-                ${dayObj.day}
-              </button>
-              <div class="itinerary-day-details" style="display:none;padding-left:12px;">
-                ${dayObj.activities.map(activity => `
-                  <div class="itinerary-collapsible-location" style="margin:6px 0;">
-                    <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
-                      ${activity}
-                    </button>
-                    <div class="itinerary-location-details" style="display:none;padding-left:10px;">
-                      <div style="margin:4px 0;"><b>Description:</b> A popular historical site in Delhi.</div>
-                      <img src="https://placehold.co/200x120?text=${encodeURIComponent(activity)}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
-                      <div><b>Timings:</b> 9:00 AM - 5:00 PM</div>
-                      <div><b>Ticket Price:</b> ₹200</div>
-                    </div>
+        // --- Collapsible itinerary for "Ask AI" section using data.itinerary ---
+        if (Array.isArray(data.itinerary) && data.itinerary.length > 0) {
+          let itineraryHTML = '';
+          data.itinerary.forEach((dayObj, index) => {
+            const dayLabel = dayObj.day || `Day ${index + 1}`;
+            // Support both "locations" (detailed objects) and "activities" (strings)
+            if (Array.isArray(dayObj.locations) && dayObj.locations.length > 0) {
+              itineraryHTML += `
+                <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
+                  <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">
+                    ${dayLabel}
+                  </button>
+                  <div class="itinerary-day-details" style="display:none;padding-left:12px;">
+                    ${dayObj.locations.map((loc, locIdx) => `
+                      <div class="itinerary-collapsible-location" style="margin:6px 0;">
+                        <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
+                          ${loc.name || `Place ${locIdx + 1}`}
+                        </button>
+                        <div class="itinerary-location-details" style="display:none;padding-left:10px;">
+                          <div style="margin:4px 0;"><b>Description:</b> ${loc.description || 'A wonderful place to visit.'}</div>
+                          <img src="${loc.photo || 'https://placehold.co/200x120?text=Photo'}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
+                          <div><b>Timings:</b> ${loc.time || loc.visit_time || '10:00 AM - 5:00 PM'}</div>
+                          <div><b>Ticket Price:</b> ${loc.ticket_price !== undefined ? loc.ticket_price : '₹200'}</div>
+                        </div>
+                      </div>
+                    `).join('')}
                   </div>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        });
-
-        aiItineraryCards.innerHTML = itineraryHTML;
-        aiItinerarySection.style.display = 'block';
-
-        aiItineraryCards.addEventListener('click', function (e) {
-          const dayToggle = e.target.closest('.itinerary-day-toggle');
-          if (dayToggle) {
-            const details = dayToggle.parentElement.querySelector('.itinerary-day-details');
-            if (details) {
-              details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+                </div>
+              `;
+            } else if (Array.isArray(dayObj.activities) && dayObj.activities.length > 0) {
+              itineraryHTML += `
+                <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
+                  <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">
+                    ${dayLabel}
+                  </button>
+                  <div class="itinerary-day-details" style="display:none;padding-left:12px;">
+                    ${dayObj.activities.map((activity, actIdx) => `
+                      <div class="itinerary-collapsible-location" style="margin:6px 0;">
+                        <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
+                          ${typeof activity === 'string' ? activity : (activity.name || `Place ${actIdx + 1}`)}
+                        </button>
+                        <div class="itinerary-location-details" style="display:none;padding-left:10px;">
+                          <div style="margin:4px 0;"><b>Description:</b> ${activity.description || 'A popular place to visit.'}</div>
+                          <img src="${activity.photo || 'https://placehold.co/200x120?text=' + encodeURIComponent(typeof activity === 'string' ? activity : (activity.name || `Place ${actIdx + 1}`))}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
+                          <div><b>Timings:</b> ${activity.time || activity.visit_time || '9:00 AM - 5:00 PM'}</div>
+                          <div><b>Ticket Price:</b> ${activity.ticket_price !== undefined ? activity.ticket_price : '₹200'}</div>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              `;
             }
-            return;
-          }
-
-          const locToggle = e.target.closest('.itinerary-location-toggle');
-          if (locToggle) {
-            e.stopPropagation();
-            const details = locToggle.parentElement.querySelector('.itinerary-location-details');
-            if (details) {
-              details.style.display = (details.style.display === 'none' ? 'block' : 'none');
-            }
-          }
-        });
+          });
+          aiItineraryCards.innerHTML = itineraryHTML;
+          aiItinerarySection.style.display = 'block';
+          // Bind event listeners for collapsible sections
+          aiItineraryCards.querySelectorAll('.itinerary-day-toggle').forEach(btn => {
+            btn.addEventListener('click', function () {
+              const details = this.parentElement.querySelector('.itinerary-day-details');
+              if (details) {
+                details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+              }
+            });
+          });
+          aiItineraryCards.querySelectorAll('.itinerary-location-toggle').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+              e.stopPropagation();
+              const details = this.parentElement.querySelector('.itinerary-location-details');
+              if (details) {
+                details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+              }
+            });
+          });
+        } else {
+          aiItineraryCards.innerHTML = '<li>No itinerary available.</li>';
+          aiItinerarySection.style.display = 'block';
+        }
       }
 
       // Final formatted dump for debugging
