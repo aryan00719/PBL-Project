@@ -314,6 +314,7 @@ FOOD_SUGGESTIONS = {
     "F9 Go Karting": ["Masala Chai", "Samosa"]
 }
 
+
 class Trip(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.String(500), nullable=False)
@@ -332,6 +333,33 @@ class Trip(db.Model):
             'itinerary': json.loads(self.itinerary or '[]'),
             'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M')
         }
+
+# ------------------------
+# City and Site models
+class City(db.Model):
+    __tablename__ = 'cities'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    state = db.Column(db.String(100))
+    region = db.Column(db.String(100))   # e.g., South India
+    description = db.Column(db.Text)
+
+    sites = db.relationship('Site', backref='city', lazy=True)
+
+
+class Site(db.Model):
+    __tablename__ = 'sites'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(150), nullable=False)
+    city_id = db.Column(db.Integer, db.ForeignKey('cities.id'), nullable=False)
+    category = db.Column(db.String(50))   # Palace, Temple, Lake, etc.
+    description = db.Column(db.Text)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    opening_hours = db.Column(db.String(100))
+    ticket_price = db.Column(db.Float)
+    best_time_to_visit = db.Column(db.String(100))
+    image_url = db.Column(db.String(250))
 
 # Function to load or cache graph using in-memory cache (per city)
 def get_cached_graph(city="Delhi, India"):
@@ -912,6 +940,75 @@ def cleanup_old_graphs(max_age_seconds=86400):
         if now - file.stat().st_mtime > max_age_seconds:
             logging.info(f"Deleting old graph file: {file.name}")
             file.unlink()
+
+# ----------- NEW ROUTES: /sites/<city_name> and /cities -----------
+
+# Return sites for a given city
+@app.route('/sites/<city_name>')
+def get_sites(city_name):
+    city = City.query.filter_by(name=city_name).first()
+    if not city:
+        return {"error": "City not found"}, 404
+    
+    sites = Site.query.filter_by(city_id=city.id).all()
+    
+    return {
+        "city": city.name,
+        "sites": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "category": s.category,
+                "description": s.description,
+                "latitude": s.latitude,
+                "longitude": s.longitude,
+                "ticket_price": s.ticket_price,
+                "best_time_to_visit": s.best_time_to_visit,
+                "image_url": s.image_url
+            }
+            for s in sites
+        ]
+    }
+
+
+# Return a list of all available cities
+@app.route('/cities')
+def get_cities():
+    cities = City.query.all()
+    return {
+        "cities": [
+            {"id": c.id, "name": c.name, "state": c.state, "region": c.region}
+            for c in cities
+        ]
+    }
+
+# Return all cities with their sites embedded
+@app.route('/cities_with_sites')
+def get_cities_with_sites():
+    cities = City.query.all()
+    result = []
+    for city in cities:
+        city_dict = {
+            "id": city.id,
+            "name": city.name,
+            "state": city.state,
+            "region": city.region,
+            "sites": []
+        }
+        for s in city.sites:
+            city_dict["sites"].append({
+                "id": s.id,
+                "name": s.name,
+                "category": s.category,
+                "description": s.description,
+                "latitude": s.latitude,
+                "longitude": s.longitude,
+                "ticket_price": s.ticket_price,
+                "best_time_to_visit": s.best_time_to_visit,
+                "image_url": s.image_url
+            })
+        result.append(city_dict)
+    return jsonify({"cities": result})
 
 if __name__ == '__main__':
     logging.info("Initializing Flask server...")
