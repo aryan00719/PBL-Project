@@ -35,6 +35,11 @@ def add_site(city_name, state, region, site_name, category="General", ticket_pri
         db.session.add(city)
         db.session.commit()
     
+    existing_site = Site.query.filter_by(name=site_name, city_id=city.id).first()
+    if existing_site:
+        print(f"⚠️ Skipping {site_name} in {city_name} (already exists)")
+        return
+    
     wiki = fetch_wikipedia_details(site_name)
     lat, lon = fetch_coordinates(site_name + ", " + city_name)
     
@@ -55,8 +60,12 @@ def add_site(city_name, state, region, site_name, category="General", ticket_pri
 
 if __name__ == "__main__":
     with app.app_context():  # ✅ important
-        add_site("Mysore", "Karnataka", "South India", "Mysore Palace", "Palace", ticket_price=70, best_time="Oct–Mar")
-        add_site("Mysore", "Karnataka", "South India", "Brindavan Gardens", "Garden")
-        add_site("Mysore", "Karnataka", "South India", "Chamundi Hill", "Temple")
-        add_site("Ooty", "Tamil Nadu", "South India", "Ooty Lake", "Lake")
-        add_site("Ooty", "Tamil Nadu", "South India", "Botanical Garden", "Park")
+        # Check if Site table is empty before inserting
+        if Site.query.first() is not None:
+            print("⚠️ Database already populated. Skipping insertions.")
+        else:
+            add_site("Mysore", "Karnataka", "South India", "Mysore Palace", "Palace", ticket_price=70, best_time="Oct–Mar")
+            add_site("Mysore", "Karnataka", "South India", "Brindavan Gardens", "Garden")
+            add_site("Mysore", "Karnataka", "South India", "Chamundi Hill", "Temple")
+            add_site("Ooty", "Tamil Nadu", "South India", "Ooty Lake", "Lake")
+            add_site("Ooty", "Tamil Nadu", "South India", "Botanical Garden", "Park")

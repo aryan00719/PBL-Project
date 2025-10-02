@@ -558,8 +558,10 @@ def ai_route():
             requested_days = int(match.group(1))
             logging.info(f"[ai_route] Detected user-requested trip length: {requested_days} days (from prompt)")
 
-        # Refined Gemini prompt: request explicit place names, not categories
-        content = get_gemini_response(
+        # ----------- Check City DB for places before Gemini logic -----------
+        # Parse city from prompt using Gemini, but fallback if necessary
+        # We'll first call Gemini to extract the city, but will check DB before AI places logic.
+        gemini_content = get_gemini_response(
             f"""From the user's travel request below, extract JSON structured like this:
 
 {{
@@ -593,17 +595,11 @@ Ensure to cover ALL places over multiple days, with 2-4 activities per day. Resp
 User's request: '{prompt}'
 """
         )
-        logging.info("AI raw response: " + content)
-        logging.info("GPT Response: " + content)
-
-        # Clean response (remove Markdown code block if present)
-        content_clean = content.strip()
+        logging.info("AI raw response: " + gemini_content)
+        content_clean = gemini_content.strip()
         if content_clean.startswith("```") and content_clean.endswith("```"):
             content_clean = re.sub(r"^```(?:json)?\s*", "", content_clean)
             content_clean = re.sub(r"\s*```$", "", content_clean)
-
-        logging.info("Cleaned AI content for parsing: " + content_clean)
-
         try:
             parsed = json.loads(content_clean)
             logging.info("Parsed AI JSON successfully: " + str(parsed))
@@ -612,18 +608,127 @@ User's request: '{prompt}'
             parsed = {"city": "unknown", "places": [], "food": [], "itinerary": []}
 
         # Fallback injection if city is unknown or no places returned
-        if parsed.get("city") == "unknown" or not parsed.get("places"):
+        if parsed.get("city") == "unknown":
             logging.warning("⚠️ Gemini failed, injecting default Delhi landmarks")
             parsed["city"] = "delhi"
             parsed["places"] = ["Red Fort", "India Gate", "Qutub Minar"]
 
         city = parsed.get("city", "delhi")
-        # Fallback for empty city names
         if not city or not str(city).strip():
             city = "delhi"
         city = city.lower()
+
+        # Try to find city in DB (case-insensitive)
+        city_obj = City.query.filter(db.func.lower(City.name) == city).first()
+        db_selected_places = []
+        if city_obj:
+            sites = Site.query.filter_by(city_id=city_obj.id).all()
+            if sites:
+                logging.info(f"Found {len(sites)} sites in DB for city '{city_obj.name}'")
+                for s in sites:
+                    # Check if coordinates are missing
+                    if s.latitude is None or s.longitude is None:
+                        # Try to geocode using existing fallback
+                        coords = geocode_with_fallbacks(f"{s.name}, {city_obj.name}, {city_obj.state}")
+                        if coords and coords.get("lat") is not None and coords.get("lng") is not None:
+                            s.latitude = coords["lat"]
+                            s.longitude = coords["lng"]
+                            try:
+                                db.session.commit()
+                                logging.info(f"Updated coordinates for site '{s.name}' in DB.")
+                            except Exception as commit_exc:
+                                db.session.rollback()
+                                logging.warning(f"Failed to commit updated coordinates for site '{s.name}': {commit_exc}")
+                        else:
+                            logging.warning(f"Could not resolve coordinates for DB site '{s.name}', skipping.")
+                            continue  # Skip this site
+                    details = {
+                        "description": s.description or "No description available.",
+                        "thumbnail": s.image_url
+                    }
+                    db_selected_places.append({
+                        "name": s.name,
+                        "lat": s.latitude,
+                        "lng": s.longitude,
+                        "details": details
+                    })
+        # If DB provided valid sites, use them directly and skip Gemini place logic
+        if db_selected_places and len(db_selected_places) >= 2:
+            logging.info(f"Using DB places for city '{city_obj.name}' instead of Gemini response.")
+            selected_places = db_selected_places
+            # For consistency, set places and itinerary
+            places = [p["name"] for p in selected_places]
+            food_list = parsed.get("food", [])
+            itinerary = parsed.get("itinerary", [])
+            itinerary = normalize_itinerary(itinerary)
+            # If itinerary is empty, fallback to auto-generation
+            if not itinerary or not isinstance(itinerary, list):
+                logging.warning("No AI itinerary (DB mode). Generating fallback itinerary.")
+                itinerary = []
+                day_count = requested_days if requested_days else max(1, len(selected_places) // 2)
+                n_places = len(selected_places)
+                base = n_places // day_count
+                rem = n_places % day_count
+                idx = 0
+                for day in range(day_count):
+                    num_places = base + (1 if day < rem else 0)
+                    activities = []
+                    for _ in range(num_places):
+                        if idx >= n_places:
+                            break
+                        place = selected_places[idx]
+                        activities.extend([
+                            f"Visit {place['name']}",
+                            f"Explore surroundings of {place['name']}",
+                            f"Try local food near {place['name']}"
+                        ])
+                        idx += 1
+                    itinerary.append({
+                        "day": f"Day {day + 1}",
+                        "activities": activities
+                    })
+            # Save trip to DB
+            trip = Trip(
+                prompt=prompt,
+                city=city,
+                places=json.dumps(places),
+                food=json.dumps(food_list),
+                itinerary=json.dumps(itinerary)
+            )
+            db.session.add(trip)
+            db.session.commit()
+            # Route calculation
+            try:
+                route_coords, instructions = calculate_optimal_path(selected_places, city=city_obj.name + ", India")
+            except Exception as e:
+                logging.warning(f"⚠️ Polygon-based routing failed for city '{city}': {e}")
+                fallback_city = selected_places[0]['name'] if selected_places else "Delhi"
+                logging.warning(f"🔁 Falling back to point-based routing using first place: '{fallback_city}'")
+                route_coords, instructions = calculate_optimal_path(selected_places, city=fallback_city)
+            return jsonify({
+                "status": "success",
+                "route": route_coords,
+                "instructions": instructions,
+                "places": [
+                    {
+                        "name": selected_places[0]["name"],
+                        "lat": selected_places[0]["lat"],
+                        "lng": selected_places[0]["lng"],
+                        "type": "start"
+                    },
+                    {
+                        "name": selected_places[-1]["name"],
+                        "lat": selected_places[-1]["lat"],
+                        "lng": selected_places[-1]["lng"],
+                        "type": "destination"
+                    }
+                ],
+                "itinerary": itinerary
+            })
+        # ----------- End DB lookup logic -----------
+
+        # If DB city or sites not found, fallback to Gemini-based logic as before
         places = parsed.get("places", [])
-        # Fallback: auto-inject a main landmark if places is empty and city is known
         if not places and city in CITY_LANDMARK_FALLBACK:
             logging.warning(f"Auto-injecting fallback landmark for city '{city}'")
             places = [CITY_LANDMARK_FALLBACK[city]]
