@@ -629,7 +629,7 @@ User's request: '{prompt}'
                     # Check if coordinates are missing
                     if s.latitude is None or s.longitude is None:
                         # Try to geocode using existing fallback
-                        coords = geocode_with_fallbacks(f"{s.name}, {city_obj.name}, {city_obj.state}")
+                        coords = geocode_place(f"{s.name}, {city_obj.name}, {city_obj.state}")
                         if coords and coords.get("lat") is not None and coords.get("lng") is not None:
                             s.latitude = coords["lat"]
                             s.longitude = coords["lng"]
