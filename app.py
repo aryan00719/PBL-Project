@@ -361,6 +361,21 @@ class Site(db.Model):
     best_time_to_visit = db.Column(db.String(100))
     image_url = db.Column(db.String(250))
 
+# Hotel model
+
+class Hotel(db.Model):
+    __tablename__ = 'hotels'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    city_id = db.Column(db.Integer, db.ForeignKey('cities.id'), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    rating = db.Column(db.Float)
+    price_range = db.Column(db.String(50))
+    image_url = db.Column(db.String(250))
+
+    city = db.relationship('City', backref='hotels')
+
 # Function to load or cache graph using in-memory cache (per city)
 def get_cached_graph(city="Delhi, India"):
     city_key = city.lower().replace(",", "").replace(" ", "_")
@@ -541,60 +556,36 @@ def handle_route_request():
 def ai_route():
     data = request.get_json()
     prompt = data.get('prompt', '').strip()
+    hotel_location = data.get('hotel_location')  # optional: {'lat':.., 'lng':..}
+
     if not prompt:
         return jsonify({'status': 'error', 'message': 'No prompt provided'}), 400
 
-    # Sanitize vague or compound region names before calling Gemini
-    prompt = re.sub(r"\(.*?\)", "", prompt)  # remove brackets like (Mysore & Coonoor)
-    prompt = prompt.replace("South India", "")  # remove broad region
-    prompt = re.sub(r"[-→]", ",", prompt)  # replace arrows or dashes with commas
-    prompt = re.sub(r"\s+", " ", prompt).strip()  # clean up extra spaces
+    prompt = re.sub(r"\(.*?\)", "", prompt)
+    prompt = prompt.replace("South India", "")
+    prompt = re.sub(r"[-→]", ",", prompt)
+    prompt = re.sub(r"\s+", " ", prompt).strip()
+
+    requested_days = None
+    match = re.search(r'(\d+)\s*[- ]?\s*day', prompt.lower())
+    if match:
+        requested_days = int(match.group(1))
+        logging.info(f"[ai_route] Detected user-requested trip length: {requested_days} days (from prompt)")
 
     try:
-        # Try to detect "X-day" request from the user's prompt (before Gemini call)
-        requested_days = None
-        match = re.search(r'(\d+)\s*[- ]?\s*day', prompt.lower())
-        if match:
-            requested_days = int(match.group(1))
-            logging.info(f"[ai_route] Detected user-requested trip length: {requested_days} days (from prompt)")
-
-        # ----------- Check City DB for places before Gemini logic -----------
-        # Parse city from prompt using Gemini, but fallback if necessary
-        # We'll first call Gemini to extract the city, but will check DB before AI places logic.
         gemini_content = get_gemini_response(
-            f"""From the user's travel request below, extract JSON structured like this:
-
+            f"""From the user's travel request below, extract JSON like this:
 {{
     "city": "...",
     "places": ["Place 1", "Place 2", ...],
-    "food": ["Dish 1", "Dish 2", ...],
+    "food": ["Dish 1", ...],
     "itinerary": [
-        {{
-            "day": "Day 1",
-            "activities": [
-                "Visit Place A",
-                "Try Food B",
-                "Explore Place C"
-            ]
-        }},
-        {{
-            "day": "Day 2",
-            "activities": [
-                "Activity X",
-                "Activity Y",
-                "Activity Z"
-            ]
-        }}
+        {{ "day": "Day 1", "activities": [ {{ "place":"Place Name", "time":"09:00-11:00", "travel_mode":"Car", "notes":"..." }} ] }}
     ]
 }}
-
-IMPORTANT: For the 'places' array, list only specific place names (such as monuments, parks, palaces, lakes, or attractions), NOT categories like "Hill Stations", "Temples", or "Museums". Each place should be a real, visitable location. Do not use generic types.
-
-Ensure to cover ALL places over multiple days, with 2-4 activities per day. Respond ONLY with the pure JSON, no explanations.
-
-User's request: '{prompt}'
-"""
+IMPORTANT: Prefer places from the provided database list when possible, but you may suggest additional well-known attractions. Respond ONLY with pure JSON."""
         )
+
         logging.info("AI raw response: " + gemini_content)
         content_clean = gemini_content.strip()
         if content_clean.startswith("```") and content_clean.endswith("```"):
@@ -602,338 +593,236 @@ User's request: '{prompt}'
             content_clean = re.sub(r"\s*```$", "", content_clean)
         try:
             parsed = json.loads(content_clean)
-            logging.info("Parsed AI JSON successfully: " + str(parsed))
         except Exception as e:
             logging.error("Failed to parse AI response as JSON. Content: " + content_clean)
             parsed = {"city": "unknown", "places": [], "food": [], "itinerary": []}
 
-        # Fallback injection if city is unknown or no places returned
-        if parsed.get("city") == "unknown":
-            logging.warning("⚠️ Gemini failed, injecting default Delhi landmarks")
-            parsed["city"] = "delhi"
-            parsed["places"] = ["Red Fort", "India Gate", "Qutub Minar"]
+        city = (parsed.get('city') or 'delhi').strip().lower()
+        if not city:
+            city = 'delhi'
 
-        city = parsed.get("city", "delhi")
-        if not city or not str(city).strip():
-            city = "delhi"
-        city = city.lower()
+        places_from_ai = parsed.get('places', []) or []
+        food_list = parsed.get('food', []) or []
+        raw_itinerary = parsed.get('itinerary', []) or []
+        itinerary = normalize_itinerary(raw_itinerary) if raw_itinerary else []
 
-        # Try to find city in DB (case-insensitive)
         city_obj = City.query.filter(db.func.lower(City.name) == city).first()
-        db_selected_places = []
-        if city_obj:
-            sites = Site.query.filter_by(city_id=city_obj.id).all()
-            if sites:
-                logging.info(f"Found {len(sites)} sites in DB for city '{city_obj.name}'")
-                for s in sites:
-                    # Check if coordinates are missing
-                    if s.latitude is None or s.longitude is None:
-                        # Try to geocode using existing fallback
-                        coords = geocode_place(f"{s.name}, {city_obj.name}, {city_obj.state}")
-                        if coords and coords.get("lat") is not None and coords.get("lng") is not None:
-                            s.latitude = coords["lat"]
-                            s.longitude = coords["lng"]
-                            try:
-                                db.session.commit()
-                                logging.info(f"Updated coordinates for site '{s.name}' in DB.")
-                            except Exception as commit_exc:
-                                db.session.rollback()
-                                logging.warning(f"Failed to commit updated coordinates for site '{s.name}': {commit_exc}")
-                        else:
-                            logging.warning(f"Could not resolve coordinates for DB site '{s.name}', skipping.")
-                            continue  # Skip this site
-                    details = {
-                        "description": s.description or "No description available.",
-                        "thumbnail": s.image_url
-                    }
-                    db_selected_places.append({
-                        "name": s.name,
-                        "lat": s.latitude,
-                        "lng": s.longitude,
-                        "details": details
+        if not city_obj:
+            city_obj = City(name=city.title(), state=None, region=None)
+            db.session.add(city_obj)
+            db.session.commit()
+            logging.info(f"Created new city record for '{city_obj.name}'")
+
+        db_sites = {s.name.lower(): s for s in Site.query.filter_by(city_id=city_obj.id).all()}
+        selected_places = []
+        for place_name in places_from_ai:
+            key = place_name.strip().lower()
+            site = db_sites.get(key)
+            if site:
+                if site.latitude is None or site.longitude is None:
+                    coords = geocode_place(f"{site.name}, {city_obj.name}, {city_obj.state or ''}")
+                    if coords:
+                        site.latitude = coords['lat']
+                        site.longitude = coords['lng']
+                        try:
+                            db.session.commit()
+                            logging.info(f"Updated coordinates for DB site '{site.name}'")
+                        except Exception:
+                            db.session.rollback()
+                if site.latitude is not None and site.longitude is not None:
+                    selected_places.append({
+                        'name': site.name,
+                        'lat': site.latitude,
+                        'lng': site.longitude,
+                        'details': {'description': site.description, 'image_url': site.image_url}
                     })
-        # If DB provided valid sites, use them directly and skip Gemini place logic
-        if db_selected_places and len(db_selected_places) >= 2:
-            logging.info(f"Using DB places for city '{city_obj.name}' instead of Gemini response.")
-            selected_places = db_selected_places
-            # For consistency, set places and itinerary
-            places = [p["name"] for p in selected_places]
-            food_list = parsed.get("food", [])
-            itinerary = parsed.get("itinerary", [])
-            itinerary = normalize_itinerary(itinerary)
-            # If itinerary is empty, fallback to auto-generation
-            if not itinerary or not isinstance(itinerary, list):
-                logging.warning("No AI itinerary (DB mode). Generating fallback itinerary.")
-                itinerary = []
-                day_count = requested_days if requested_days else max(1, len(selected_places) // 2)
-                n_places = len(selected_places)
-                base = n_places // day_count
-                rem = n_places % day_count
+                else:
+                    logging.warning(f"Skipping DB site '{site.name}' due to missing coords after geocode attempt")
+            else:
+                coords = geocode_place(f"{place_name}, {city_obj.name}, {city_obj.state or ''}")
+                if coords:
+                    new_site = Site(
+                        name=place_name.strip(),
+                        city_id=city_obj.id,
+                        category=None,
+                        description=None,
+                        latitude=coords['lat'],
+                        longitude=coords['lng'],
+                        image_url=None
+                    )
+                    try:
+                        db.session.add(new_site)
+                        db.session.commit()
+                        db_sites[new_site.name.lower()] = new_site
+                        logging.info(f"Inserted new site '{new_site.name}' into DB for city {city_obj.name}")
+                        selected_places.append({
+                            'name': new_site.name,
+                            'lat': new_site.latitude,
+                            'lng': new_site.longitude,
+                            'details': {'description': new_site.description, 'image_url': new_site.image_url}
+                        })
+                    except Exception as e:
+                        db.session.rollback()
+                        logging.warning(f"Failed to insert new site '{place_name}' into DB: {e}")
+                else:
+                    logging.warning(f"Could not geocode Gemini-suggested place '{place_name}', skipping.")
+
+        if len(selected_places) < 2:
+            logging.warning("Not enough DB/Gemini combined places resolved; falling back to generic geocoding flow.")
+            selected_places = []
+            for place_name in places_from_ai:
+                coords = geocode_place(place_name)
+                if coords:
+                    details = get_place_details(place_name, coords['lat'], coords['lng'])
+                    selected_places.append({'name': place_name, 'lat': coords['lat'], 'lng': coords['lng'], 'details': details})
+
+        days = []
+        if itinerary and isinstance(itinerary, list) and isinstance(itinerary[0].get('activities', []), list):
+            structured = False
+            for day in itinerary:
+                acts = day.get('activities', [])
+                if acts and isinstance(acts[0], dict) and acts[0].get('place'):
+                    structured = True
+                    break
+            if structured:
+                for day in itinerary:
+                    day_places = []
+                    for act in day.get('activities', []):
+                        pname = act.get('place') if isinstance(act, dict) else None
+                        if not pname:
+                            continue
+                        match = next((p for p in selected_places if p['name'].lower() == pname.strip().lower()), None)
+                        if match:
+                            day_places.append(match)
+                    days.append({'day': day.get('day', 'Day X'), 'places': day_places, 'activities': day.get('activities', [])})
+            else:
+                day_count = len(itinerary)
+                if requested_days:
+                    day_count = requested_days
+                n = len(selected_places)
+                base = n // max(1, day_count)
+                rem = n % max(1, day_count)
                 idx = 0
-                for day in range(day_count):
-                    num_places = base + (1 if day < rem else 0)
-                    activities = []
-                    for _ in range(num_places):
-                        if idx >= n_places:
-                            break
-                        place = selected_places[idx]
-                        activities.extend([
-                            f"Visit {place['name']}",
-                            f"Explore surroundings of {place['name']}",
-                            f"Try local food near {place['name']}"
-                        ])
-                        idx += 1
-                    itinerary.append({
-                        "day": f"Day {day + 1}",
-                        "activities": activities
-                    })
-            # Save trip to DB
-            trip = Trip(
-                prompt=prompt,
-                city=city,
-                places=json.dumps(places),
-                food=json.dumps(food_list),
-                itinerary=json.dumps(itinerary)
-            )
+                for d in range(day_count):
+                    num = base + (1 if d < rem else 0)
+                    days.append({'day': f'Day {d+1}', 'places': selected_places[idx: idx+num], 'activities': []})
+                    idx += num
+        else:
+            day_count = requested_days if requested_days else max(1, len(selected_places) // 2)
+            n = len(selected_places)
+            base = n // max(1, day_count)
+            rem = n % max(1, day_count)
+            idx = 0
+            for d in range(day_count):
+                num = base + (1 if d < rem else 0)
+                days.append({'day': f'Day {d+1}', 'places': selected_places[idx: idx+num], 'activities': []})
+                idx += num
+
+        # ---- HOTEL INTEGRATION LOGIC ----
+        hotel_point = None
+        hotel_source = None
+        # 1. Use user's hotel if provided
+        if hotel_location and isinstance(hotel_location, dict):
+            if hotel_location.get('lat') is not None and hotel_location.get('lng') is not None:
+                hotel_point = {
+                    'name': hotel_location.get('name', 'Hotel'),
+                    'lat': float(hotel_location['lat']),
+                    'lng': float(hotel_location['lng']),
+                    'details': {}
+                }
+                hotel_source = "provided_by_user"
+                logging.info(f"Hotel location provided by user: {hotel_point}")
+        # 2. If not provided, look up default hotel for that city from DB
+        if hotel_point is None:
+            hotels_db = Hotel.query.filter_by(city_id=city_obj.id).all()
+            valid_hotel = None
+            for h in hotels_db:
+                if h.latitude is not None and h.longitude is not None:
+                    valid_hotel = h
+                    break
+            if valid_hotel:
+                hotel_point = {
+                    'name': valid_hotel.name,
+                    'lat': valid_hotel.latitude,
+                    'lng': valid_hotel.longitude,
+                    'details': {'image_url': valid_hotel.image_url, 'rating': valid_hotel.rating}
+                }
+                hotel_source = "fetched_from_db"
+                logging.info(f"Hotel fetched from DB for city '{city_obj.name}': {hotel_point}")
+            else:
+                hotel_source = "none_found"
+                logging.info(f"No valid hotel found in DB for city '{city_obj.name}'.")
+        # 3. If no hotel or missing coordinates, fallback to first site in day's itinerary
+
+        day_routes = []
+        all_instructions = []
+        for day in days:
+            place_list = day['places']
+            # Determine start/end point for this day
+            _hotel_point = hotel_point
+            _hotel_source = hotel_source
+            # If no hotel or coords missing, fallback to first site in day's itinerary
+            if (_hotel_point is None or _hotel_point.get('lat') is None or _hotel_point.get('lng') is None):
+                if place_list and place_list[0].get('lat') is not None and place_list[0].get('lng') is not None:
+                    _hotel_point = place_list[0]
+                    _hotel_source = "fallback_first_site"
+                    logging.info(f"Hotel fallback: using first site '{_hotel_point['name']}' as start/end for {day.get('day')}")
+                else:
+                    _hotel_point = None
+                    _hotel_source = "no_valid_start"
+                    logging.warning(f"No valid hotel or site to use as route start/end for {day.get('day')}")
+
+            # Always use hotel → places → hotel sequence (if possible)
+            if _hotel_point:
+                seq = [_hotel_point] + place_list + [_hotel_point]
+            else:
+                seq = place_list
+
+            # Remove duplicates by coordinates, but always keep hotel at start and end
+            unique_seq = []
+            seen = set()
+            for idx, p in enumerate(seq):
+                if p.get('lat') is None or p.get('lng') is None:
+                    continue
+                key = (round(p['lat'], 5), round(p['lng'], 5))
+                # Always allow hotel at start and end, but skip duplicate in between
+                if idx == 0 or idx == len(seq) - 1:
+                    unique_seq.append(p)
+                elif key not in seen:
+                    unique_seq.append(p)
+                    seen.add(key)
+
+            if len(unique_seq) < 2:
+                logging.warning(f"Not enough points to route for {day.get('day')}.")
+                day_routes.append({'day': day.get('day'), 'route': [], 'places': [p['name'] for p in unique_seq]})
+                continue
+
+            try:
+                route_coords, instructions = calculate_optimal_path(unique_seq, city=city_obj.name + ", India")
+            except Exception as e:
+                logging.warning(f"Day routing failed for {day.get('day')}: {e}. Trying fallback using first place.")
+                try:
+                    first_place = unique_seq[0]['name'] if unique_seq else city_obj.name
+                    route_coords, instructions = calculate_optimal_path(unique_seq, city=first_place)
+                except Exception as e2:
+                    logging.error(f"Fallback routing failed for {day.get('day')}: {e2}")
+                    route_coords, instructions = [], []
+
+            day_routes.append({'day': day.get('day'), 'route': route_coords, 'places': [p['name'] for p in unique_seq]})
+            if instructions:
+                all_instructions.extend([f"{day.get('day')}: {ins}" for ins in instructions])
+
+        trip = Trip(prompt=prompt, city=city, places=json.dumps([p['name'] for p in selected_places]), food=json.dumps(food_list), itinerary=json.dumps(itinerary))
+        try:
             db.session.add(trip)
             db.session.commit()
-            # Route calculation
-            try:
-                route_coords, instructions = calculate_optimal_path(selected_places, city=city_obj.name + ", India")
-            except Exception as e:
-                logging.warning(f"⚠️ Polygon-based routing failed for city '{city}': {e}")
-                fallback_city = selected_places[0]['name'] if selected_places else "Delhi"
-                logging.warning(f"🔁 Falling back to point-based routing using first place: '{fallback_city}'")
-                route_coords, instructions = calculate_optimal_path(selected_places, city=fallback_city)
-            return jsonify({
-                "status": "success",
-                "route": route_coords,
-                "instructions": instructions,
-                "places": [
-                    {
-                        "name": selected_places[0]["name"],
-                        "lat": selected_places[0]["lat"],
-                        "lng": selected_places[0]["lng"],
-                        "type": "start"
-                    },
-                    {
-                        "name": selected_places[-1]["name"],
-                        "lat": selected_places[-1]["lat"],
-                        "lng": selected_places[-1]["lng"],
-                        "type": "destination"
-                    }
-                ],
-                "itinerary": itinerary
-            })
-        # ----------- End DB lookup logic -----------
+        except Exception:
+            db.session.rollback()
 
-        # If DB city or sites not found, fallback to Gemini-based logic as before
-        places = parsed.get("places", [])
-        if not places and city in CITY_LANDMARK_FALLBACK:
-            logging.warning(f"Auto-injecting fallback landmark for city '{city}'")
-            places = [CITY_LANDMARK_FALLBACK[city]]
-        food_list = parsed.get("food", [])
-        itinerary = parsed.get("itinerary", [])
-        itinerary = normalize_itinerary(itinerary)
-
-        # Static place_db used as fallback if geocoding fails
-        place_db = {
-            "jaipur": {
-                "Amber Fort": {"lat": 26.9855, "lng": 75.8513},
-                "Hawa Mahal": {"lat": 26.9239, "lng": 75.8267},
-                "Jal Mahal": {"lat": 26.9539, "lng": 75.8466},
-                "City Palace": {"lat": 26.9262, "lng": 75.8238},
-                "Jantar Mantar": {"lat": 26.9258, "lng": 75.8236},
-                "Albert Hall Museum": {"lat": 26.9118, "lng": 75.8195},
-                "Johari Bazaar": {"lat": 26.9210, "lng": 75.8327}
-            },
-            "delhi": {
-                "Red Fort": {"lat": 28.6562, "lng": 77.2410},
-                "Qutub Minar": {"lat": 28.5245, "lng": 77.1855},
-                "India Gate": {"lat": 28.6129, "lng": 77.2295},
-                "Lotus Temple": {"lat": 28.5535, "lng": 77.2588},
-                "Humayun's Tomb": {"lat": 28.5933, "lng": 77.2507},
-                "Chandni Chowk": {"lat": 28.6564, "lng": 77.2303},
-                "Lodhi Garden": {"lat": 28.5916, "lng": 77.2195},
-                "Connaught Place": {"lat": 28.6315, "lng": 77.2167},
-                "Raj Ghat": {"lat": 28.6400, "lng": 77.2495},
-                "Akshardham Temple": {"lat": 28.6127, "lng": 77.2773},
-                "Vijay Chowk": {"lat": 28.6145, "lng": 77.2038}
-            }
-        }
-
-        # Add fuzzy matching for place names
-        from difflib import get_close_matches
-
-        def fuzzy_match_place(name, place_db):
-            matches = get_close_matches(name, place_db.keys(), n=1, cutoff=0.8)
-            return matches[0] if matches else None
-
-        # Build selected_places strictly from AI's "places" list for routing, and fetch Wikipedia details
-        selected_places = []
-        for place_name in places:
-            coords = place_db.get(city, {}).get(place_name)
-            if not coords:
-                match = fuzzy_match_place(place_name, place_db.get(city, {}))
-                if match:
-                    logging.info(f"Fuzzy matched '{place_name}' to '{match}'")
-                    coords = place_db[city][match]
-                else:
-                    coords = geocode_place(place_name)
-                logging.debug(f"Geocoded '{place_name}' to {coords}")
-            if coords:
-                details = get_place_details(place_name, coords["lat"], coords["lng"])
-                selected_places.append({
-                    "name": place_name,
-                    "lat": coords["lat"],
-                    "lng": coords["lng"],
-                    "details": details
-                })
-            else:
-                logging.warning(f"Could not resolve coordinates for {place_name}")
-
-        # Consolidated fallback: If selected_places is empty but we still have parsed places, log fallback attempt and retry geocoding.
-        if not selected_places and places:
-            logging.warning("⚠️ selected_places is empty but raw places list has values. Attempting final geocode pass...")
-            for fallback_place in places:
-                coords = geocode_place(fallback_place)
-                if coords:
-                    details = get_place_details(fallback_place, coords["lat"], coords["lng"])
-                    selected_places.append({
-                        "name": fallback_place,
-                        "lat": coords["lat"],
-                        "lng": coords["lng"],
-                        "details": details
-                    })
-                    logging.info(f"✅ Final fallback geocode success: {fallback_place} -> {coords}")
-                else:
-                    logging.error(f"❌ Final fallback geocode failed: {fallback_place}")
-            logging.info(f"📦 Final selected_places after fallback: {len(selected_places)}")
-
-        logging.debug(f"Final selected_places list: {selected_places}")
-
-        # UX fallback if not enough locations resolved
-        if len(selected_places) < 2:
-            logging.warning("⚠️ Not enough locations resolved for a valid route. Prompt user to revise.")
-            return jsonify({
-                'status': 'error',
-                'message': 'Only one valid place found. Please mention at least two distinct landmarks or locations in your prompt.'
-            }), 400
-
-        trip = Trip(
-            prompt=prompt,
-            city=city,
-            places=json.dumps(places),
-            food=json.dumps(food_list),
-            itinerary=json.dumps(itinerary)
-        )
-        db.session.add(trip)
-        db.session.commit()
-
-        # Fallbacks
-        if not places:
-            places = ["Red Fort"]
-        if not food_list:
-            if city == "jaipur":
-                food_list = ["Dal Baati", "Ghewar"]
-            elif city == "delhi":
-                food_list = ["Chole Bhature", "Paratha"]
-
-        if not selected_places:
-            details = get_place_details("Red Fort", 28.6562, 77.2410)
-            selected_places = [{
-                "name": "Red Fort",
-                "lat": 28.6562,
-                "lng": 77.2410,
-                "details": details
-            }]
-
-        logging.warning(f"🧭 Final selected_places = {selected_places}")
-        try:
-            route_coords, instructions = calculate_optimal_path(selected_places, city=city.title() + ", India")
-        except Exception as e:
-            logging.warning(f"⚠️ Polygon-based routing failed for city '{city}': {e}")
-            fallback_city = selected_places[0]['name'] if selected_places else "Delhi"
-            logging.warning(f"🔁 Falling back to point-based routing using first place: '{fallback_city}'")
-            route_coords, instructions = calculate_optimal_path(selected_places, city=fallback_city)
-        logging.warning(f"🧭 Route coordinates preview: {route_coords[:3]}")
-
-        if not itinerary or not isinstance(itinerary, list):
-            logging.warning("AI itinerary missing or invalid. Generating fallback itinerary.")
-            itinerary = []
-            # Use requested_days if available, else auto-calculate
-            if requested_days:
-                day_count = requested_days
-                logging.info(f"[ai_route] Using user-requested days: {day_count}")
-            else:
-                day_count = max(1, len(selected_places) // 2)
-                logging.info(f"[ai_route] No explicit days detected, auto-calculated: {day_count} days")
-
-            if requested_days:
-                # Distribute all selected_places evenly across day_count days
-                n_places = len(selected_places)
-                base = n_places // day_count
-                rem = n_places % day_count
-                idx = 0
-                for day in range(day_count):
-                    num_places = base + (1 if day < rem else 0)
-                    activities = []
-                    for _ in range(num_places):
-                        if idx >= n_places:
-                            break
-                        place = selected_places[idx]
-                        activities.extend([
-                            f"Visit {place['name']}",
-                            f"Explore surroundings of {place['name']}",
-                            f"Try local food near {place['name']}"
-                        ])
-                        idx += 1
-                    itinerary.append({
-                        "day": f"Day {day + 1}",
-                        "activities": activities
-                    })
-            else:
-                # Old logic: auto-split by places_per_day
-                places_per_day = max(1, len(selected_places) // day_count)
-                for day in range(day_count):
-                    activities = []
-                    slice_start = day * places_per_day
-                    slice_end = min((day + 1) * places_per_day, len(selected_places))
-                    for place in selected_places[slice_start:slice_end]:
-                        activities.extend([
-                            f"Visit {place['name']}",
-                            f"Explore surroundings of {place['name']}",
-                            f"Try local food near {place['name']}"
-                        ])
-                    itinerary.append({
-                        "day": f"Day {day + 1}",
-                        "activities": activities
-                    })
-
-        # Only show start and destination as markers in the response, with type attribute
-        return jsonify({
-            "status": "success",
-            "route": route_coords,
-            "instructions": instructions,
-            "places": [
-                {
-                    "name": selected_places[0]["name"],
-                    "lat": selected_places[0]["lat"],
-                    "lng": selected_places[0]["lng"],
-                    "type": "start"
-                },
-                {
-                    "name": selected_places[-1]["name"],
-                    "lat": selected_places[-1]["lat"],
-                    "lng": selected_places[-1]["lng"],
-                    "type": "destination"
-                }
-            ],
-            "itinerary": itinerary
-        })
+        return jsonify({'status': 'success', 'days': day_routes, 'instructions': all_instructions, 'itinerary': itinerary})
 
     except Exception as e:
-        logging.error("Full exception details: " + str(e))
+        logging.error('Full exception details: ' + str(e))
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/ai-itinerary', methods=['POST'])

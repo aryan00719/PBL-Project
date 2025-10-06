@@ -56,6 +56,27 @@ document.addEventListener('DOMContentLoaded', () => {
   loadMockItinerary();
 });
 
+// Allow user to select hotel location by clicking on the map
+function enableHotelSelection() {
+  alert("Click on the map to set your hotel location.");
+  map.once('click', function (e) {
+    const { lat, lng } = e.latlng;
+    if (window.hotelMarker) {
+      map.removeLayer(window.hotelMarker);
+    }
+    window.hotelMarker = L.marker([lat, lng], {
+      icon: L.icon({
+        iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+      })
+    }).addTo(map).bindPopup("🏨 Hotel Location").openPopup();
+    window.hotelLocation = { lat, lng };
+    map.setView([lat, lng], 14);
+    alert("Hotel location set!");
+  });
+}
+
 // Function to initialize the Leaflet map
 function initMap() {
   map = L.map('map', {
