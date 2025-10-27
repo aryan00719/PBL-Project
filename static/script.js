@@ -278,444 +278,362 @@ async function submitAIPrompt() {
     const data = await res.json();
     console.log("📦 Raw AI response JSON:", data);
 
-    // --- Route array conversion fix ---
-    if (Array.isArray(data.route)) {
-      if (
-        data.route.length > 0 &&
-        Array.isArray(data.route[0]) &&
-        typeof data.route[0][0] === 'number' &&
-        typeof data.route[0][1] === 'number'
-      ) {
-        data.route = data.route.map(coord => ({
-          lat: coord[0],
-          lng: coord[1]
-        }));
-        console.log("🔁 Converted route array from [lat, lng] to { lat, lng } format.");
-      } else if (
-        typeof data.route[0]?.lat === 'number' &&
-        typeof data.route[0]?.lng === 'number'
-      ) {
-        console.log("✅ Route already in { lat, lng } format.");
-      } else {
-        console.warn("⚠️ Unexpected route format:", JSON.stringify(data.route, null, 2));
-      }
-    }
-    // Show route instructions if available
-    if (Array.isArray(data.instructions) && data.instructions.length > 0) {
-      const enriched = data.instructions.map(instr => {
-        const match = instr.match(/(go|head)\s+(\w+)/i);
-        return {
-          instruction: instr,
-          direction: match ? match[2] : 'forward',
-          distance: instr.match(/(\d+)\s?m/i)?.[1] || ''
-        };
-      });
-      renderInstructions(enriched);
-    } else {
-      console.warn("⚠️ No instructions received or format invalid.");
+    // always render itinerary UI if present
+    if (typeof renderAIItinerarySection === 'function') {
+      renderAIItinerarySection(data.itinerary || data.days || []);
     }
 
-    try {
-      if (data.status !== 'success') throw new Error(data.message);
-
-      // Filter out invalid coordinates
-      const validRoute = (data.route || []).filter(coord => (
-        coord && typeof coord.lat === 'number' && typeof coord.lng === 'number'
-      ));
-
-      // Fallback if route is missing: use placeToCoords for known places
-      if (validRoute.length < 2 && Array.isArray(data.places)) {
-        // Remove all previous markers before rendering fallback markers
-        clearAllMarkers();
-        // Only one start and one end marker, and a dashed line between them
-        if (data.places.length >= 2) {
-          const start = data.places[0];
-          const end = data.places[data.places.length - 1];
-
-          const startCoord = validRoute[0] || { lat: 28.6139, lng: 77.2090 }; // Delhi fallback
-          const endCoord = validRoute[1] || { lat: 28.6139, lng: 77.2190 };
-
-          const startMarker = L.marker([startCoord.lat, startCoord.lng]).addTo(map).bindPopup(`<b>🚩Start: ${start}</b>`);
-          const endMarker = L.marker([endCoord.lat, endCoord.lng]).addTo(map).bindPopup(`<b>End: ${end}</b>`);
-
-          markers.push(startMarker, endMarker);
-          window.currentMarkers.push(startMarker, endMarker);
-
-          const fallbackLine = L.polyline([[startCoord.lat, startCoord.lng], [endCoord.lat, endCoord.lng]], {
-            color: 'gray',
-            dashArray: '5, 5'
-          }).addTo(map);
-
-          map.fitBounds(fallbackLine.getBounds().pad(0.1));
-        } else if (data.places.length === 1) {
-          const fallbackLatLng = L.latLng(28.6139, 77.2090); // Delhi center
-          const marker = L.marker(fallbackLatLng).addTo(map).bindPopup(`<b>${data.places[0]}</b>`);
-          markers.push(marker);
-          window.currentMarkers.push(marker);
-          map.setView(fallbackLatLng, 13);
+    // Normalize any route formats to array of {lat, lng}
+    let normalized = [];
+    if (Array.isArray(data.route) && data.route.length > 0) {
+      // route may be [[lat,lng], [lat,lng]] or [{lat:..,lng:..}] or [{latitude:..,longitude:..}]
+      for (const r of data.route) {
+        if (Array.isArray(r) && r.length >= 2 && typeof r[0] === 'number') {
+          normalized.push({ lat: r[0], lng: r[1] });
+        } else if (r && typeof r.lat === 'number' && typeof r.lng === 'number') {
+          normalized.push({ lat: r.lat, lng: r.lng });
+        } else if (r && typeof r.latitude === 'number' && typeof r.longitude === 'number') {
+          normalized.push({ lat: r.latitude, lng: r.longitude });
         }
       }
+    }
 
-      // Extra last-resort fuzzy mapping if nothing matched above
-      if (validRoute.length === 0 && Array.isArray(data.places) && data.places.length > 0) {
-        console.warn("⚠️ No matched coordinates from known places. Attempting last-resort mapping.");
-        data.places.forEach(p => {
-          if (typeof p !== 'string') {
-            if (typeof p.name === 'string') {
-              const name = p.name.toLowerCase().replace(/[^a-z]/g, '');
-              for (const key in placeToCoords) {
-                if (name.includes(key)) {
-                  validRoute.push({ lat: placeToCoords[key][0], lng: placeToCoords[key][1] });
-                  console.log("🔄 Last-resort fuzzy match (object):", p.name, "→", key);
-                  break;
-                }
-              }
-            } else {
-              console.warn("⚠️ Skipping non-string place without name:", p);
-            }
-            return;
-          }
-          const name = p.toLowerCase().replace(/[^a-z]/g, '');
-          for (const key in placeToCoords) {
-            if (name.includes(key)) {
-              validRoute.push({ lat: placeToCoords[key][0], lng: placeToCoords[key][1] });
-              console.log("🔄 Last-resort fuzzy match:", p, "→", key);
-              break;
-            }
+    // if no route in data.route, try to extract from data.days or data.itinerary
+    if (normalized.length < 2) {
+      if (Array.isArray(data.days)) {
+        data.days.forEach(day => {
+          if (Array.isArray(day.route)) {
+            day.route.forEach(p => {
+              if (Array.isArray(p) && p.length >= 2 && typeof p[0] === 'number') normalized.push({ lat: p[0], lng: p[1] });
+              else if (p && typeof p.lat === 'number' && typeof p.lng === 'number') normalized.push({ lat: p.lat, lng: p.lng });
+            });
           }
         });
       }
 
-      if (validRoute.length === 0) {
-        console.warn("No coordinates in route field, falling back to known location matching.");
-      }
-      // Debug: log validRoute after construction
-      console.log("✅ ValidRoute computed:", validRoute);
-      // Debug: log route length before planning
-      console.log("⚠️ Route length before planning:", validRoute.length);
-      // ✅ Only now do the final validation check
-      if (validRoute.length < 2) {
-        console.warn("🚫 Not enough valid coordinates for routing (even after fallback):", JSON.stringify(validRoute, null, 2));
-
-        // Remove all previous markers before rendering fallback markers
-        clearAllMarkers();
-
-        // If places exist, show only start/end marker using existing start/end coordinates if possible
-        // Commented out fallback marker rendering loop (see above for removal)
-        // Clean start/end marker-only logic using existing start/end coordinates
-        if (data.places && data.places.length >= 2) {
-          const start = data.places[0];
-          const end = data.places[data.places.length - 1];
-
-          const startCoord = validRoute[0];
-          const endCoord = validRoute[validRoute.length - 1];
-
-          const startMarker = L.marker([startCoord.lat, startCoord.lng]).addTo(map).bindPopup(`<b>Start: ${start}</b>`);
-          const endMarker = L.marker([endCoord.lat, endCoord.lng]).addTo(map).bindPopup(`<b>End: ${end}</b>`);
-
-          markers.push(startMarker, endMarker);
-          window.currentMarkers.push(startMarker, endMarker);
-
-          const fallbackLine = L.polyline([[startCoord.lat, startCoord.lng], [endCoord.lat, endCoord.lng]], {
-            color: 'gray',
-            dashArray: '5, 5'
-          }).addTo(map);
-          map.fitBounds(fallbackLine.getBounds().pad(0.1));
-        } else if (data.places && data.places.length === 1) {
-          // If only 1 place, fallback to showing a single marker at Delhi center
-          const fallbackLatLng = L.latLng(28.6139, 77.2090); // Delhi center
-          const marker = L.marker(fallbackLatLng).addTo(map).bindPopup(`<b>${data.places[0]}</b>`);
-          markers.push(marker);
-          window.currentMarkers.push(marker);
-          map.setView(fallbackLatLng, 13);
-        }
-
-        alert("Could not generate full route, but places are shown on the map.");
-        hideLoader();
-        return;
-      }
-
-      clearAllMarkers();
-
-      if (routingControl) {
-        routingControl.getPlan().setWaypoints([]);
-        map.removeControl(routingControl);
-        routingControl = null;
-      }
-
-      console.log("AI Places:", data.places);
-      // --- Debugging output for AI response fields ---
-      if (!Array.isArray(data.places) || data.places.length === 0) {
-        console.warn("⚠️ Warning: No places returned from AI response.");
-      }
-      if (!Array.isArray(data.route)) {
-        console.warn("⚠️ Warning: No route array returned from AI response.");
-      }
-      if (Array.isArray(data.route) && data.route.length > 0) {
-        console.info("✅ Route returned with " + data.route.length + " coordinates.");
-      }
       if (Array.isArray(data.itinerary)) {
-        console.info("🗓️ Itinerary received with " + data.itinerary.length + " days.");
+        data.itinerary.forEach(day => {
+          const acts = Array.isArray(day.activities) ? day.activities : (Array.isArray(day.locations) ? day.locations : []);
+          acts.forEach(act => {
+            if (act && typeof act.lat === 'number' && typeof act.lng === 'number') normalized.push({ lat: act.lat, lng: act.lng });
+          });
+        });
       }
-      console.log("AI Route:", data.route);
+    }
 
-      // --- Only show one start marker and one end marker with custom icons and popups ---
-      if (validRoute.length >= 2) {
-        // Remove old route if it exists
-        if (window.routeLayer) {
-          map.removeLayer(window.routeLayer);
-        }
-
-        // Draw the polyline for the full route
-        const routeLatLngs = validRoute.map(coord => [coord.lat, coord.lng]);
-        window.routeLayer = L.polyline(routeLatLngs, { color: "blue", weight: 5 }).addTo(map);
-        map.fitBounds(window.routeLayer.getBounds());
-
-        // Only add one green start marker and one red end marker
-        if (Array.isArray(data.places) && data.places.length > 0) {
-          const start = data.places[0];
-          const end = data.places[data.places.length - 1];
-
-          // Start marker (green pin)
-          const startMarker = L.marker([validRoute[0].lat, validRoute[0].lng], {
-            icon: L.icon({
-              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41]
-            })
-          }).addTo(map).bindPopup(`<b>🚩 Start: ${typeof start === 'string' ? start : start.name}</b>`);
-          markers.push(startMarker);
-          window.currentMarkers.push(startMarker);
-
-          // End marker (red pin)
-          const endMarker = L.marker([validRoute[validRoute.length - 1].lat, validRoute[validRoute.length - 1].lng], {
-            icon: L.icon({
-              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41]
-            })
-          }).addTo(map).bindPopup(`<b>📍 Destination: ${typeof end === 'string' ? end : end.name}</b>`);
-          markers.push(endMarker);
-          window.currentMarkers.push(endMarker);
-        }
-
-        // --- Use renderInstructions for instruction panel ---
-        if (data.instructions && data.instructions.length > 0) {
-          const enriched = data.instructions.map(instr => {
-            const match = instr.match(/(go|head)\s+(\w+)/i);
-            return {
-              instruction: instr,
-              direction: match ? match[2] : 'forward',
-              distance: instr.match(/(\d+)\s?m/i)?.[1] || ''
-            };
-          });
-          renderInstructions(enriched);
-        } else {
-          renderInstructions([]);
-        }
-      } else if (data.places && data.places.length >= 2) {
-        // Fallback: show only start marker and dashed gray line between start and end (plain marker)
-        const start = data.places[0];
-        const end = data.places[data.places.length - 1];
-        // Try to get coordinates from validRoute if available, otherwise fallback to Delhi
-        const startCoord = validRoute[0] || { lat: 28.6139, lng: 77.2090 };
-        const endCoord = validRoute[1] || { lat: 28.6139, lng: 77.2190 };
-
-        // Start marker (green pin)
-        const startMarker = L.marker([startCoord.lat, startCoord.lng], {
-          icon: L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-          })
-        }).addTo(map).bindPopup(`<b>🚩 Start: ${typeof start === 'string' ? start : start.name}</b>`);
-        markers.push(startMarker);
-        window.currentMarkers.push(startMarker);
-
-        // End marker (red pin)
-        const endMarker = L.marker([endCoord.lat, endCoord.lng], {
-          icon: L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-          })
-        }).addTo(map).bindPopup(`<b>📍 Destination: ${typeof end === 'string' ? end : end.name}</b>`);
-        markers.push(endMarker);
-        window.currentMarkers.push(endMarker);
-
-        const fallbackLine = L.polyline([[startCoord.lat, startCoord.lng], [endCoord.lat, endCoord.lng]], {
-          color: 'gray',
-          dashArray: '5, 5'
-        }).addTo(map);
-        map.fitBounds(fallbackLine.getBounds().pad(0.1));
-
-        // --- Use renderInstructions for instruction panel ---
-        if (data.instructions && data.instructions.length > 0) {
-          const enriched = data.instructions.map(instr => {
-            const match = instr.match(/(go|head)\s+(\w+)/i);
-            return {
-              instruction: instr,
-              direction: match ? match[2] : 'forward',
-              distance: instr.match(/(\d+)\s?m/i)?.[1] || ''
-            };
-          });
-          renderInstructions(enriched);
-        } else {
-          renderInstructions([]);
-        }
-      } else if (data.places && data.places.length === 1) {
-        // Only one place, show a single marker at Delhi center
-        const fallbackLatLng = L.latLng(28.6139, 77.2090); // Delhi center
-        const marker = L.marker(fallbackLatLng).addTo(map).bindPopup(`<b>${data.places[0]}</b>`);
-        markers.push(marker);
-        window.currentMarkers.push(marker);
-        map.setView(fallbackLatLng, 13);
-
-        // --- Use renderInstructions for instruction panel ---
-        if (data.instructions && data.instructions.length > 0) {
-          const enriched = data.instructions.map(instr => {
-            const match = instr.match(/(go|head)\s+(\w+)/i);
-            return {
-              instruction: instr,
-              direction: match ? match[2] : 'forward',
-              distance: instr.match(/(\d+)\s?m/i)?.[1] || ''
-            };
-          });
-          renderInstructions(enriched);
-        } else {
-          renderInstructions([]);
-        }
-      }
-
-      console.log("📍 Waypoints being passed to router:", JSON.stringify(validRoute, null, 2));
-      // Show route on map
-      routingControl = L.Routing.control({
-        waypoints: (validRoute.length > data.places.length)
-          ? validRoute.map(coord => L.latLng(coord.lat, coord.lng))
-          : (data.places || []).map(() => map.getCenter()),
-        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-        routeWhileDragging: false,
-        lineOptions: { styles: [{ color: '#0074D9', weight: 5 }] },
-        createMarker: () => null,    // 🚫 disable default markers
-        show: false
-      }).addTo(map);
-
-      // Show food suggestions
-      const list = document.getElementById('food-list');
-      list.innerHTML = Array.isArray(data.food_suggestions)
-        ? data.food_suggestions.map(f => `<li>${f}</li>`).join('')
-        : '<li>No food suggestions available.</li>';
-
-      const aiItinerarySection = document.getElementById('ai-itinerary-section');
-      const aiItineraryCards = document.getElementById('ai-itinerary-cards');
-      const itineraryList = aiItineraryCards; // For event binding, use same as aiItineraryCards
-
-      if (aiItinerarySection && aiItineraryCards) {
-        // --- Collapsible itinerary for "Ask AI" section using data.itinerary ---
-        if (Array.isArray(data.itinerary) && data.itinerary.length > 0) {
-          let itineraryHTML = '';
-          data.itinerary.forEach((dayObj, index) => {
-            const dayLabel = dayObj.day || `Day ${index + 1}`;
-            // Support both "locations" (detailed objects) and "activities" (strings)
-            if (Array.isArray(dayObj.locations) && dayObj.locations.length > 0) {
-              itineraryHTML += `
-                <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
-                  <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">
-                    ${dayLabel}
-                  </button>
-                  <div class="itinerary-day-details" style="display:none;padding-left:12px;">
-                    ${dayObj.locations.map((loc, locIdx) => `
-                      <div class="itinerary-collapsible-location" style="margin:6px 0;">
-                        <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
-                          ${loc.name || `Place ${locIdx + 1}`}
-                        </button>
-                        <div class="itinerary-location-details" style="display:none;padding-left:10px;">
-                          <div style="margin:4px 0;"><b>Description:</b> ${loc.description || 'A wonderful place to visit.'}</div>
-                          <img src="${loc.photo || 'https://placehold.co/200x120?text=Photo'}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
-                          <div><b>Timings:</b> ${loc.time || loc.visit_time || '10:00 AM - 5:00 PM'}</div>
-                          <div><b>Ticket Price:</b> ${loc.ticket_price !== undefined ? loc.ticket_price : '₹200'}</div>
-                        </div>
-                      </div>
-                    `).join('')}
-                  </div>
-                </div>
-              `;
-            } else if (Array.isArray(dayObj.activities) && dayObj.activities.length > 0) {
-              itineraryHTML += `
-                <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
-                  <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">
-                    ${dayLabel}
-                  </button>
-                  <div class="itinerary-day-details" style="display:none;padding-left:12px;">
-                    ${dayObj.activities.map((activity, actIdx) => `
-                      <div class="itinerary-collapsible-location" style="margin:6px 0;">
-                        <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
-                          ${typeof activity === 'string' ? activity : (activity.name || `Place ${actIdx + 1}`)}
-                        </button>
-                        <div class="itinerary-location-details" style="display:none;padding-left:10px;">
-                          <div style="margin:4px 0;"><b>Description:</b> ${activity.description || 'A popular place to visit.'}</div>
-                          <img src="${activity.photo || 'https://placehold.co/200x120?text=' + encodeURIComponent(typeof activity === 'string' ? activity : (activity.name || `Place ${actIdx + 1}`))}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
-                          <div><b>Timings:</b> ${activity.time || activity.visit_time || '9:00 AM - 5:00 PM'}</div>
-                          <div><b>Ticket Price:</b> ${activity.ticket_price !== undefined ? activity.ticket_price : '₹200'}</div>
-                        </div>
-                      </div>
-                    `).join('')}
-                  </div>
-                </div>
-              `;
+    // Last-resort: fuzzy match place names to known placeToCoords
+    if (normalized.length < 2 && Array.isArray(data.places)) {
+      for (const p of data.places) {
+        if (typeof p === 'string') {
+          const key = p.toLowerCase().replace(/[^a-z]/g, '');
+          for (const k in placeToCoords) {
+            if (key.includes(k)) {
+              normalized.push({ lat: placeToCoords[k][0], lng: placeToCoords[k][1] });
+              break;
             }
-          });
-          aiItineraryCards.innerHTML = itineraryHTML;
-          aiItinerarySection.style.display = 'block';
-          // Bind event listeners for collapsible sections
-          aiItineraryCards.querySelectorAll('.itinerary-day-toggle').forEach(btn => {
-            btn.addEventListener('click', function () {
-              const details = this.parentElement.querySelector('.itinerary-day-details');
-              if (details) {
-                details.style.display = (details.style.display === 'none' ? 'block' : 'none');
-              }
-            });
-          });
-          aiItineraryCards.querySelectorAll('.itinerary-location-toggle').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-              e.stopPropagation();
-              const details = this.parentElement.querySelector('.itinerary-location-details');
-              if (details) {
-                details.style.display = (details.style.display === 'none' ? 'block' : 'none');
-              }
-            });
-          });
-        } else {
-          aiItineraryCards.innerHTML = '<li>No itinerary available.</li>';
-          aiItinerarySection.style.display = 'block';
+          }
+        } else if (p && typeof p.name === 'string') {
+          const key = p.name.toLowerCase().replace(/[^a-z]/g, '');
+          for (const k in placeToCoords) {
+            if (key.includes(k)) {
+              normalized.push({ lat: placeToCoords[k][0], lng: placeToCoords[k][1] });
+              break;
+            }
+          }
         }
       }
+    }
 
-      // Final formatted dump for debugging
-      console.log("🧪 Final data object for debugging:", JSON.stringify(data, null, 2));
-      console.log("✅ Finished processing AI route, map should be updated.");
-      hideLoader();
-    } catch (frontendErr) {
-      console.error("💥 Frontend processing error after AI response:", frontendErr);
-      alert("Frontend error after AI response: " + (frontendErr.message || frontendErr));
+    // Deduplicate coordinates (by lat/lng rounded)
+    const seen = new Set();
+    const validRoute = [];
+    normalized.forEach(c => {
+      if (!c || typeof c.lat !== 'number' || typeof c.lng !== 'number') return;
+      const key = `${c.lat.toFixed(6)},${c.lng.toFixed(6)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        validRoute.push(c);
+      }
+    });
+
+    console.log('✅ Normalized validRoute:', validRoute);
+
+    // If still not enough points, notify and render whatever markers we have
+    if (validRoute.length < 2) {
+      console.warn('🚫 Not enough points for routing. Showing markers only.');
+      clearAllMarkers();
+      // show markers for known places if available
+      if (Array.isArray(data.places) && data.places.length > 0) {
+        data.places.forEach((p, idx) => {
+          let latlng = null;
+          if (Array.isArray(p) && p.length >= 2 && typeof p[0] === 'number') latlng = { lat: p[0], lng: p[1] };
+          else if (p && typeof p.lat === 'number' && typeof p.lng === 'number') latlng = { lat: p.lat, lng: p.lng };
+          else if (typeof p === 'string') {
+            const key = p.toLowerCase().replace(/[^a-z]/g, '');
+            if (placeToCoords[key]) latlng = { lat: placeToCoords[key][0], lng: placeToCoords[key][1] };
+          }
+          if (latlng) {
+            const m = L.marker([latlng.lat, latlng.lng]).addTo(map).bindPopup(`<b>${typeof p === 'string' ? p : (p.name || 'Place')}</b>`);
+            markers.push(m);
+            window.currentMarkers.push(m);
+          }
+        });
+        if (window.currentMarkers.length > 0) {
+          const group = new L.featureGroup(window.currentMarkers);
+          map.fitBounds(group.getBounds().pad(0.15));
+        }
+      }
       hideLoader();
       return;
     }
+
+    // Clear any previous drawn route layers and markers
+    if (window.routeLayer) { map.removeLayer(window.routeLayer); window.routeLayer = null; }
+    if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+    clearAllMarkers();
+
+    // Draw and focus on route
+    if (validRoute.length >= 2) {
+      const routeLatLngs = validRoute.map(c => [c.lat, c.lng]);
+
+      if (window.routeLayer) map.removeLayer(window.routeLayer);
+      window.routeLayer = L.polyline(routeLatLngs, { color: '#0074D9', weight: 5, opacity: 0.9 }).addTo(map);
+
+      map.fitBounds(window.routeLayer.getBounds().pad(0.15));
+
+      if (routingControl) map.removeControl(routingControl);
+      routingControl = L.Routing.control({
+        waypoints: validRoute.map(c => L.latLng(c.lat, c.lng)),
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+        routeWhileDragging: false,
+        show: false,
+        createMarker: () => null,
+        lineOptions: { styles: [{ color: '#0074D9', weight: 4 }] }
+      }).addTo(map);
+    }
+    // add start/end markers
+    const start = validRoute[0];
+    const end = validRoute[validRoute.length - 1];
+    const startMarker = L.marker([start.lat, start.lng], { icon: categoryIcons.culture }).addTo(map).bindPopup('<b>Start</b>').openPopup();
+    const endMarker = L.marker([end.lat, end.lng], { icon: categoryIcons.food }).addTo(map).bindPopup('<b>End</b>');
+    markers.push(startMarker, endMarker); window.currentMarkers.push(startMarker, endMarker);
+
+    // Fit map to route
+    map.fitBounds(window.routeLayer.getBounds().pad(0.12));
+
+    // Also create a routingControl for turn-by-turn if desired (OSRM) — use the validRoute points as waypoints
+    try {
+      routingControl = L.Routing.control({
+        waypoints: validRoute.map(c => L.latLng(c.lat, c.lng)),
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+        routeWhileDragging: false,
+        show: false,
+        createMarker: () => null,
+        lineOptions: { styles: [{ color: '#0074D9', weight: 4 }] }
+      }).addTo(map);
+
+      // If routing gives routes, hide default leaflet routing UI and show our instructions panel
+      routingControl.on('routesfound', function (e) {
+        const routes = e.routes || [];
+        if (routes.length > 0) {
+          const summary = routes[0].summary || {};
+          console.log('Routing summary:', summary);
+        }
+      });
+    } catch (err) {
+      console.warn('Routing control failed, but polyline is drawn:', err);
+    }
+
+    // Render instructions panel if AI provided 'instructions'
+    if (Array.isArray(data.instructions) && data.instructions.length > 0) {
+      const enriched = data.instructions.map(instr => ({ instruction: instr, distance: instr.match(/(\d+\.?\d*)\s?m/i)?.[1] || '' }));
+      renderInstructions(enriched);
+    }
+
+    // populate food suggestions
+    const list = document.getElementById('food-list');
+    list.innerHTML = Array.isArray(data.food) ? data.food.map(f => `<li>${f}</li>`).join('') : '<li>No food suggestions available.</li>';
+
+    // ---- Enhanced AI Itinerary Rendering ----
+    // const aiItinerarySection = document.getElementById('ai-itinerary-section');
+    // const aiItineraryCards = document.getElementById('ai-itinerary-cards');
+    // if (aiItinerarySection && aiItineraryCards && Array.isArray(data.itinerary)) {
+    //   aiItineraryCards.innerHTML = '';
+    //   if (window.aiItineraryMarkers) {
+    //     window.aiItineraryMarkers.forEach(m => map.removeLayer(m));
+    //   }
+    //   window.aiItineraryMarkers = [];
+
+    //   data.itinerary.forEach((day, dayIdx) => {
+    //     const dayLabel = day.day || `Day ${dayIdx + 1}`;
+    //     const dayDiv = document.createElement('div');
+    //     dayDiv.classList.add('itinerary-collapsible-day');
+    //     dayDiv.innerHTML = `
+    //       <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">${dayLabel}</button>
+    //       <div class="itinerary-day-details" style="display:none;padding-left:12px;"></div>
+    //     `;
+    //     const detailsDiv = dayDiv.querySelector('.itinerary-day-details');
+
+    //     const places = Array.isArray(day.locations) ? day.locations : (Array.isArray(day.activities) ? day.activities : []);
+    //     places.forEach((loc, locIdx) => {
+    //       const name = loc.name || loc.place || `Place ${locIdx + 1}`;
+    //       const lat = loc.lat, lng = loc.lng;
+    //       const photo = loc.photo || 'https://placehold.co/200x120?text=Photo';
+    //       const desc = loc.description || loc.details || 'A great place to visit.';
+    //       const food = loc.food || loc.famous_food || '';
+    //       const time = loc.time || loc.visit_time || '10:00 AM - 5:00 PM';
+    //       const price = (loc.ticket_price !== undefined) ? loc.ticket_price : '₹200';
+
+    //       if (typeof lat === 'number' && typeof lng === 'number') {
+    //         const icon = categoryIcons[loc.category] || L.icon({
+    //           iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+    //           iconSize: [25, 41],
+    //           iconAnchor: [12, 41]
+    //         });
+    //         const popupHTML = `
+    //           <div style="font-weight:bold;font-size:1.1em;margin-bottom:4px;">${name}</div>
+    //           <img src="${photo}" style="width:200px;height:120px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
+    //           <div><b>Description:</b> ${desc}</div>
+    //           ${food ? `<div><b>Famous Food:</b> ${food}</div>` : ''}
+    //           <div><b>Timings:</b> ${time}</div>
+    //           <div><b>Ticket Price:</b> ${price}</div>
+    //         `;
+    //         const marker = L.marker([lat, lng], { icon }).addTo(map).bindPopup(popupHTML);
+    //         window.aiItineraryMarkers.push(marker);
+
+    //         const locDiv = document.createElement('div');
+    //         locDiv.classList.add('itinerary-collapsible-location');
+    //         locDiv.innerHTML = `
+    //           <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
+    //             ${name}
+    //           </button>
+    //           <div class="itinerary-location-details" style="display:none;padding-left:10px;">
+    //             <div style="margin:4px 0;"><b>Description:</b> ${desc}</div>
+    //             ${food ? `<div><b>Famous Food:</b> ${food}</div>` : ''}
+    //             <img src="${photo}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
+    //             <div><b>Timings:</b> ${time}</div>
+    //             <div><b>Ticket Price:</b> ${price}</div>
+    //           </div>
+    //         `;
+    //         detailsDiv.appendChild(locDiv);
+
+    //         // Click to zoom to the marker and open popup
+    //         locDiv.querySelector('.itinerary-location-toggle').addEventListener('click', (e) => {
+    //           e.stopPropagation();
+    //           const details = locDiv.querySelector('.itinerary-location-details');
+    //           details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+    //           map.setView([lat, lng], 14);
+    //           marker.openPopup();
+    //         });
+    //       }
+    //     });
+
+    //     // Add day toggle event immediately after appending
+    //     const dayToggle = dayDiv.querySelector('.itinerary-day-toggle');
+    //     dayToggle.addEventListener('click', () => {
+    //       const details = dayDiv.querySelector('.itinerary-day-details');
+    //       details.style.display = (details.style.display === 'none' ? 'block' : 'none');
+    //     });
+
+    //     // Append the whole day block
+    //     aiItineraryCards.appendChild(dayDiv);
+    //   });
+
+    //   // Ensure collapsible toggles work after DOM is added
+    //   setTimeout(() => {
+    //     document.querySelectorAll('.itinerary-day-toggle').forEach(btn => {
+    //       btn.addEventListener('click', () => {
+    //         const details = btn.parentElement.querySelector('.itinerary-day-details');
+    //         if (details) {
+    //           details.style.display = details.style.display === 'none' ? 'block' : 'none';
+    //         }
+    //       });
+    //     });
+
+    //     document.querySelectorAll('.itinerary-location-toggle').forEach(btn => {
+    //       btn.addEventListener('click', (e) => {
+    //         e.stopPropagation();
+    //         const details = btn.parentElement.querySelector('.itinerary-location-details');
+    //         if (details) {
+    //           details.style.display = details.style.display === 'none' ? 'block' : 'none';
+    //         }
+    //       });
+    //     });
+    //   }, 0);
+
+    //   aiItinerarySection.style.display = 'block';
+
+    //   if (window.aiItineraryMarkers.length > 0) {
+    //     const group = new L.featureGroup(window.aiItineraryMarkers);
+    //     map.fitBounds(group.getBounds().pad(0.15));
+    //   }
+    // }
+
+    // ---- Simplified AI Itinerary Rendering (non-collapsible) ----
+    const aiItinerarySection = document.getElementById('ai-itinerary-section');
+    const aiItineraryCards = document.getElementById('ai-itinerary-cards');
+
+    if (aiItinerarySection && aiItineraryCards && Array.isArray(data.itinerary)) {
+      aiItineraryCards.innerHTML = '';
+
+      if (window.aiItineraryMarkers) {
+        window.aiItineraryMarkers.forEach(m => map.removeLayer(m));
+      }
+      window.aiItineraryMarkers = [];
+
+      // Build compact markup using CSS classes (avoid inline styles that override your stylesheet)
+      const markup = data.itinerary.map((day, dayIdx) => {
+        const dayLabel = day.day || `Day ${dayIdx + 1}`;
+        const places = Array.isArray(day.locations)
+          ? day.locations
+          : (Array.isArray(day.activities) ? day.activities : []);
+
+        const placesHTML = places.map((loc, locIdx) => {
+          const name = (loc && (loc.name || loc.place)) ? (loc.name || loc.place) : `Place ${locIdx + 1}`;
+          const desc = loc && (loc.description || loc.details) ? (loc.description || loc.details) : '';
+          const time = loc && (loc.time || loc.visit_time) ? (loc.time || loc.visit_time) : '';
+          const photo = loc && loc.photo ? loc.photo : '';
+
+          // add marker if coords present
+          if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+            const marker = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(`<b>${name}</b><br>${desc}`);
+            window.aiItineraryMarkers.push(marker);
+          }
+
+          return `
+            <div class="itinerary-item">
+              ${photo ? `<img class="itinerary-photo" src="${photo}" alt="${name}">` : ''}
+              <div class="itinerary-content">
+                <div class="itinerary-place">${name}</div>
+                ${time ? `<div class="itinerary-time">${time}</div>` : ''}
+                ${desc ? `<div class="itinerary-notes">${desc}</div>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="itinerary-card">
+            <div class="itinerary-day">${dayLabel}</div>
+            <div class="itinerary-day-places">${placesHTML}</div>
+          </div>
+        `;
+      }).join('');
+
+      aiItineraryCards.innerHTML = markup;
+      aiItinerarySection.style.display = 'block';
+
+      if (window.aiItineraryMarkers.length > 0) {
+        const group = new L.featureGroup(window.aiItineraryMarkers);
+        map.fitBounds(group.getBounds().pad(0.15));
+      }
+    }
+
+
+    hideLoader();
   } catch (err) {
-    console.error("AI route fetch failed:", err);
-    alert("AI route error: " + (err.message || "Unknown error"));
+    console.error('AI route fetch failed:', err);
+    alert('AI route error: ' + (err.message || 'Unknown error'));
     hideLoader();
   }
 }
@@ -881,159 +799,82 @@ async function fetchItinerary(places) {
   hideLoader();
 }
 
+
 // ---- End of itinerary/map/collapsible enhancements ----
 
-// ---- Mock Itinerary Functionality ----
-function loadMockItinerary() {
-  // 1. Clear existing markers
-  if (window.itineraryMarkers) {
-    window.itineraryMarkers.forEach(m => map.removeLayer(m));
+// ---- Enhanced renderItinerary Functionality ----
+/**
+ * Renders the itinerary with collapsible days, clickable places (zoom to marker), and food suggestions.
+ * @param {Array} itinerary - Array of day objects with activities [{place, time, notes, ...}]
+ * @param {Array} foodList - Array of food strings for suggestions (optional)
+ */
+function renderItinerary(itinerary, foodList = []) {
+  const itineraryDiv = document.getElementById("itinerary");
+  itineraryDiv.innerHTML = "";
+
+  if (!itinerary || itinerary.length === 0) {
+    itineraryDiv.innerHTML = "<p>No itinerary available.</p>";
+    return;
   }
-  window.itineraryMarkers = [];
 
-  // 2. Create a mock itinerary data structure with days and locations
-  const mockItinerary = [
-    {
-      day: "Day 1: Arrival & Exploring Old Delhi",
-      locations: [
-        {
-          name: "Red Fort",
-          lat: 28.6562,
-          lng: 77.2410,
-          photo: "https://upload.wikimedia.org/wikipedia/commons/6/6d/Red_Fort_in_Delhi_03-2016_img3.jpg",
-          time: "9:00 AM - 12:00 PM",
-          ticket_price: "₹500",
-          description: "A historic fort in Old Delhi, served as the main residence of Mughal Emperors."
-        },
-        {
-          name: "Chandni Chowk",
-          lat: 28.6564,
-          lng: 77.2303,
-          photo: "https://upload.wikimedia.org/wikipedia/commons/8/8e/Chandni_Chowk_Market_Delhi_2016.jpg",
-          time: "12:30 PM - 2:00 PM",
-          ticket_price: "Free",
-          description: "Bustling market street famous for food, shopping and vibrant atmosphere."
-        }
-      ]
-    },
-    {
-      day: "Day 2: Monuments & Spiritual Sites",
-      locations: [
-        {
-          name: "Qutub Minar",
-          lat: 28.5245,
-          lng: 77.1855,
-          photo: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Qutb_Minar_-_Delhi.jpg",
-          time: "10:00 AM - 12:00 PM",
-          ticket_price: "₹600",
-          description: "A UNESCO World Heritage site, tallest brick minaret in the world."
-        },
-        {
-          name: "Lotus Temple",
-          lat: 28.5535,
-          lng: 77.2588,
-          photo: "https://upload.wikimedia.org/wikipedia/commons/1/1e/LOTUS_TEMPLE_DELHI.jpg",
-          time: "2:00 PM - 4:00 PM",
-          ticket_price: "Free",
-          description: "Famous Baháʼí House of Worship known for its flowerlike shape."
-        }
-      ]
-    }
-  ];
+  const foodSamples = foodList.slice(0, 3); // Take top 3 food items for suggestions
 
-  // 3. Populate the itinerary list with collapsible day sections and location details
-  const itinerarySection = document.getElementById('itinerary-section');
-  const itineraryList = document.getElementById('itinerary-list');
-  if (itinerarySection && itineraryList) {
-    let itineraryHTML = '';
-    mockItinerary.forEach((day, dayIdx) => {
-      const dayLabel = day.day || `Day ${dayIdx + 1}`;
-      itineraryHTML += `
-        <div class="itinerary-collapsible-day" style="margin-bottom:8px;">
-          <button class="itinerary-day-toggle" style="font-weight:bold;width:100%;text-align:left;padding:8px;border:none;background:#eee;cursor:pointer;border-radius:4px;">${dayLabel}</button>
-          <div class="itinerary-day-details" style="display:none;padding-left:12px;">
-            ${Array.isArray(day.locations) ? day.locations.map((loc, locIdx) => `
-              <div class="itinerary-collapsible-location" style="margin:6px 0;">
-                <button class="itinerary-location-toggle" style="font-size:1em;width:100%;text-align:left;padding:6px;border:none;background:#f9f9f9;cursor:pointer;border-radius:4px;">
-                  ${loc.name || `Place ${locIdx + 1}`}
-                </button>
-                <div class="itinerary-location-details" style="display:none;padding-left:10px;">
-                  <div style="margin:4px 0;"><b>Description:</b> ${loc.description || 'A wonderful place to visit.'}</div>
-                  <img src="${loc.photo || 'https://placehold.co/200x120?text=Photo'}" alt="photo" style="width:180px;height:100px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
-                  <div><b>Timings:</b> ${loc.time || loc.visit_time || '10:00 AM - 5:00 PM'}</div>
-                  <div><b>Ticket Price:</b> ${loc.ticket_price !== undefined ? loc.ticket_price : '₹200'}</div>
-                </div>
-              </div>
-            `).join('') : ''}
-          </div>
-        </div>
-      `;
+  itinerary.forEach((day) => {
+    const dayContainer = document.createElement("div");
+    dayContainer.className = "day-container";
+
+    const dayHeader = document.createElement("div");
+    dayHeader.className = "day-header";
+    dayHeader.textContent = day.day;
+
+    const activitiesList = document.createElement("div");
+    activitiesList.className = "activities-list";
+    activitiesList.style.display = "none";
+
+    dayHeader.addEventListener("click", () => {
+      activitiesList.style.display =
+        activitiesList.style.display === "none" ? "block" : "none";
     });
-    itineraryList.innerHTML = itineraryHTML;
-    itinerarySection.style.display = 'block';
-    setTimeout(() => {
-      itineraryList.querySelectorAll('.itinerary-day-toggle').forEach(btn => {
-        btn.addEventListener('click', function () {
-          const details = this.parentElement.querySelector('.itinerary-day-details');
-          if (details) {
-            details.style.display = (details.style.display === 'none' ? 'block' : 'none');
-          }
-        });
-      });
-      itineraryList.querySelectorAll('.itinerary-location-toggle').forEach(btn => {
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          const details = this.parentElement.querySelector('.itinerary-location-details');
-          if (details) {
-            details.style.display = (details.style.display === 'none' ? 'block' : 'none');
-          }
-        });
-      });
-    }, 0);
-  }
 
-  // 4. Pin the locations on the map with markers showing name, photo, timings, ticket price, and description in a popup
-  let allLocations = [];
-  mockItinerary.forEach(day => {
-    if (Array.isArray(day.locations)) {
-      allLocations = allLocations.concat(day.locations);
-    }
+    day.activities.forEach((activity) => {
+      const activityItem = document.createElement("div");
+      activityItem.className = "activity-item";
+
+      const title = document.createElement("h4");
+      title.textContent = `${activity.place} (${activity.time})`;
+      title.style.cursor = "pointer";
+
+      // When user clicks on a place, zoom to its marker
+      title.addEventListener("click", () => {
+        const marker = markers.find(
+          (m) => m.options.title === activity.place
+        );
+        if (marker) {
+          map.setView(marker.getLatLng(), 14);
+          marker.openPopup();
+        }
+      });
+
+      const notes = document.createElement("p");
+      notes.textContent = activity.notes;
+
+      // Add "Famous food to try" suggestion
+      const foodNote = document.createElement("p");
+      if (foodSamples.length > 0) {
+        const randomFood = foodSamples[Math.floor(Math.random() * foodSamples.length)];
+        foodNote.innerHTML = `<strong>🍴 Try:</strong> ${randomFood}`;
+      }
+
+      activityItem.appendChild(title);
+      activityItem.appendChild(notes);
+      activityItem.appendChild(foodNote);
+      activitiesList.appendChild(activityItem);
+    });
+
+    dayContainer.appendChild(dayHeader);
+    dayContainer.appendChild(activitiesList);
+    itineraryDiv.appendChild(dayContainer);
   });
-  for (const loc of allLocations) {
-    let lat = loc.lat, lng = loc.lng;
-    if (typeof lat !== 'number' || typeof lng !== 'number') continue;
-    // Check for duplicate markers by lat/lng
-    const latLngKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-    if (window.itineraryMarkers.some(m => {
-      const pos = m.getLatLng();
-      return `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` === latLngKey;
-    })) {
-      continue;
-    }
-    let icon = L.icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41]
-    });
-    const name = loc.name || 'Place';
-    const photo = loc.photo || 'https://placehold.co/200x120?text=Photo';
-    const time = loc.time || loc.visit_time || '10:00 AM - 5:00 PM';
-    const price = (loc.ticket_price !== undefined) ? loc.ticket_price : '₹200';
-    const desc = loc.description || 'A wonderful place to visit.';
-    const popupContent = `
-      <div style="font-weight:bold;font-size:1.1em;margin-bottom:4px;">${name}</div>
-      <img src="${photo}" alt="photo" style="width:200px;height:120px;object-fit:cover;border-radius:4px;margin-bottom:4px;">
-      <div><b>Timings:</b> ${time}</div>
-      <div><b>Ticket Price:</b> ${price}</div>
-      <div style="margin-top:4px;">${desc}</div>
-    `;
-    const marker = L.marker([lat, lng], { icon }).addTo(map).bindPopup(popupContent);
-    window.itineraryMarkers.push(marker);
-  }
-  if (window.itineraryMarkers.length > 0) {
-    const group = new L.featureGroup(window.itineraryMarkers);
-    map.fitBounds(group.getBounds().pad(0.18));
-  }
 }
 
 function applyTheme(isDark) {

@@ -12,6 +12,20 @@ from dotenv import load_dotenv
 import json
 import requests
 
+import pyproj
+try:
+    # prefer Homebrew location (Apple Silicon) then Intel location, fallback to pyproj probe
+    if os.path.isdir('/opt/homebrew/share/proj'):
+        os.environ['PROJ_DATA'] = '/opt/homebrew/share/proj'
+    elif os.path.isdir('/usr/local/share/proj'):
+        os.environ['PROJ_DATA'] = '/usr/local/share/proj'
+    else:
+        import pyproj
+        os.environ['PROJ_DATA'] = pyproj.datadir.get_data_dir()
+except Exception:
+    # leave unchanged if nothing found; pyproj will warn/error later
+    pass
+
 load_dotenv()
 
 import google.generativeai as genai
@@ -32,6 +46,20 @@ CITY_LANDMARK_FALLBACK = {
     "delhi": "Red Fort",
     "jaipur": "Hawa Mahal"
 }
+
+def normalize_place_name(place_name: str) -> str:
+    """
+    Ensures a place name is scoped to India for geocoding and graph creation
+    by appending ', India' if it's not already present.
+    """
+    if not place_name or "india" in place_name.lower():
+        return place_name
+
+    # Simple append, as geocoders are good at handling "City, Country"
+    normalized_name = f"{place_name}, India"
+    logging.info(f"🌍 Normalized place name: '{place_name}' -> '{normalized_name}'")
+    return normalized_name
+
 
 def get_gemini_response(prompt, retries=2):
     for attempt in range(retries):
@@ -60,12 +88,13 @@ def normalize_itinerary(itinerary_raw):
 
     return normalized
 
-
 def geocode_place(place_name):
     if place_name.lower() in geocode_cache:
         return geocode_cache[place_name.lower()]
 
-    url = f"https://nominatim.openstreetmap.org/search"
+    # Normalize place name to bias towards India
+    normalized_place_name = normalize_place_name(place_name)
+    url = "https://nominatim.openstreetmap.org/search"
     params = {
         'q': place_name,
         'format': 'json',
@@ -73,7 +102,7 @@ def geocode_place(place_name):
     }
     headers = {'User-Agent': 'TravelMapApp/1.0'}
     try:
-        response = requests.get(url, params=params, headers=headers)
+        response = requests.get(url, params={'q': normalized_place_name, 'format': 'json', 'limit': 1}, headers=headers)
         data = response.json()
         if data:
             # Conditional override for known incorrect results
@@ -227,6 +256,11 @@ def fallback_geocode(place_name):
         "ooty lake": {"lat": 11.4125, "lng": 76.6935},
         "sim's park": {"lat": 11.3531, "lng": 76.8142},
         "mysore palace": {"lat": 12.3051, "lng": 76.6551},
+        # Mysore area landmarks
+        "brindavan gardens": {"lat": 12.4216, "lng": 76.5723},
+        "st. philomena's cathedral": {"lat": 12.3229, "lng": 76.6626},
+        "jaganmohan palace art gallery": {"lat": 12.3053, "lng": 76.6541},
+        "karanji lake": {"lat": 12.2957, "lng": 76.6816},
         "marina beach": {"lat": 13.0500, "lng": 80.2824},
         "india gate": {"lat": 28.6129, "lng": 77.2295},
         "charminar": {"lat": 17.3616, "lng": 78.4747},
@@ -257,6 +291,7 @@ def fallback_geocode(place_name):
         "delhi": {"lat": 28.6139, "lng": 77.2090},
         "lucknow": {"lat": 26.8467, "lng": 80.9462},
         "the residency": {"lat": 26.8605, "lng": 80.9466},
+        "imperial palace east garden": {"lat": 35.6852, "lng": 139.7528},
     }
     # Try exact match first
     for name in simplified_names + [place_name.lower()]:
@@ -335,31 +370,42 @@ class Trip(db.Model):
         }
 
 # ------------------------
-# City and Site models
+# City and Site models (corrected)
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
+
 class City(db.Model):
-    __tablename__ = 'cities'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    __tablename__ = "cities"
+
+    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
-    state = db.Column(db.String(100))
-    region = db.Column(db.String(100))   # e.g., South India
-    description = db.Column(db.Text)
-
-    sites = db.relationship('Site', backref='city', lazy=True)
-
-
-class Site(db.Model):
-    __tablename__ = 'sites'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(150), nullable=False)
-    city_id = db.Column(db.Integer, db.ForeignKey('cities.id'), nullable=False)
-    category = db.Column(db.String(50))   # Palace, Temple, Lake, etc.
+    state = db.Column(db.String(100), nullable=False)
+    region = db.Column(db.String(100), nullable=True) 
     description = db.Column(db.Text)
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
-    opening_hours = db.Column(db.String(100))
-    ticket_price = db.Column(db.Float)
+
+    # Relationship — use back_populates instead of backref
+    sites = db.relationship("Site", back_populates="city", lazy=True)
+    hotels = db.relationship("Hotel", back_populates="city", lazy=True)
+
+
+class Site(db.Model):
+    __tablename__ = "site"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    category = db.Column(db.String(100))
+    description = db.Column(db.Text)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    ticket_price = db.Column(db.String(50))
     best_time_to_visit = db.Column(db.String(100))
-    image_url = db.Column(db.String(250))
+    image_url = db.Column(db.String(255))
+    city_id = db.Column(db.Integer, db.ForeignKey("cities.id"), nullable=False)
+
+    # Relationship — link back to City with back_populates
+    city = db.relationship("City", back_populates="sites")
 
 # Hotel model
 
@@ -374,11 +420,19 @@ class Hotel(db.Model):
     price_range = db.Column(db.String(50))
     image_url = db.Column(db.String(250))
 
-    city = db.relationship('City', backref='hotels')
+    # CORRECTED: Use back_populates to match the City model
+    city = db.relationship('City', back_populates='hotels')
 
 # Function to load or cache graph using in-memory cache (per city)
 def get_cached_graph(city="Delhi, India"):
+    # Support global routing, not just India
+    if not any(country in city.lower() for country in ["india", "france", "italy", "japan", "usa", "uk", "spain", "germany", "australia", "canada"]):
+        logging.info(f"🌍 Non-Indian city detected ('{city}'). Attempting global map fetch...")
+    else:
+        logging.info(f"Fetching map data for '{city}'...")
+
     city_key = city.lower().replace(",", "").replace(" ", "_")
+
     if city_key in graph_cache:
         logging.info(f"Reusing in-memory graph for {city}")
         return graph_cache[city_key]
@@ -400,7 +454,6 @@ def get_cached_graph(city="Delhi, India"):
         G = ox.graph_from_place(city, network_type='drive')
     except Exception as e:
         logging.warning(f"⚠️ graph_from_place failed for '{city}': {e}")
-        # Attempt fallback using geocoded point
         point = geocode_place(city)
         if point:
             logging.info(f"🧭 Falling back to graph_from_point around: {point}")
@@ -424,7 +477,28 @@ def calculate_optimal_path(places, city="Delhi, India"):
         else:
             logging.warning(f"Duplicate coordinates detected, skipping place: {place['name']}")
 
+    # Remove duplicate endpoint if start and end are the same (by rounded lat/lng)
+    if len(unique_places) > 1 and (round(unique_places[0]['lat'], 5), round(unique_places[0]['lng'], 5)) == (round(unique_places[-1]['lat'], 5), round(unique_places[-1]['lng'], 5)):
+        logging.info("Start and end points are identical, removing duplicate endpoint.")
+        unique_places.pop()
+
     places = unique_places
+
+    # If deduplication left fewer than 2 places, create a tiny jitter fallback so routing can proceed
+    if len(places) < 2:
+        if len(places) == 1:
+            p = places[0]
+            logging.warning("Only one unique location found; creating small jitter fallback around the location for routing.")
+            jitter = 0.0006  # ~60m — small enough to be local but big enough for routing
+            fallback_point = {
+                'name': f"{p.get('name', 'Fallback')} (fallback)",
+                'lat': p['lat'] + jitter,
+                'lng': p['lng'] + jitter
+            }
+            places = [p, fallback_point]
+        else:
+            logging.error("Not enough unique valid locations to build a route.")
+            return [], []
 
     if len(places) < 2:
         logging.error("Not enough unique valid locations to build a route.")
@@ -573,29 +647,73 @@ def ai_route():
         logging.info(f"[ai_route] Detected user-requested trip length: {requested_days} days (from prompt)")
 
     try:
-        gemini_content = get_gemini_response(
-            f"""From the user's travel request below, extract JSON like this:
+        gemini_prompt = f"""
+You are a travel planner exclusively for India.
+Generate a structured JSON response for the user's prompt.
+**IMPORTANT: Only use cities, places, and landmarks located within India.**
+If the user mentions a foreign place (e.g., Paris, Tokyo), find a suitable Indian equivalent or focus on the Indian locations in the prompt.
+
+The JSON should strictly follow this format:
 {{
-    "city": "...",
-    "places": ["Place 1", "Place 2", ...],
-    "food": ["Dish 1", ...],
-    "itinerary": [
-        {{ "day": "Day 1", "activities": [ {{ "place":"Place Name", "time":"09:00-11:00", "travel_mode":"Car", "notes":"..." }} ] }}
-    ]
+  "city": "<main city in India>",
+  "places": ["list of major tourist places in that city"],
+  "food": ["famous local dishes"],
+  "itinerary": [
+    {{
+      "day": "Day 1",
+      "activities": [
+        {{
+          "place": "<place name>",
+          "time": "<HH:MM-HH:MM or Morning/Evening>",
+          "travel_mode": "<Walk/Taxi/Car/Bus>",
+          "notes": "<short note>"
+        }}
+      ]
+    }}
+  ]
 }}
-IMPORTANT: Prefer places from the provided database list when possible, but you may suggest additional well-known attractions. Respond ONLY with pure JSON."""
-        )
+
+User's prompt: {prompt}
+"""
+        gemini_content = get_gemini_response(gemini_prompt)
 
         logging.info("AI raw response: " + gemini_content)
         content_clean = gemini_content.strip()
-        if content_clean.startswith("```") and content_clean.endswith("```"):
-            content_clean = re.sub(r"^```(?:json)?\s*", "", content_clean)
-            content_clean = re.sub(r"\s*```$", "", content_clean)
+
+        # Extract JSON portion even if Gemini adds text before/after
+        json_match = re.search(r'\{[\s\S]*\}', content_clean)
+        if json_match:
+            content_clean = json_match.group(0)
+        else:
+            # Try code block pattern
+            block_match = re.search(r'```json\s*([\s\S]*?)\s*```', content_clean)
+            if block_match:
+                content_clean = block_match.group(1)
+
         try:
             parsed = json.loads(content_clean)
         except Exception as e:
-            logging.error("Failed to parse AI response as JSON. Content: " + content_clean)
+            logging.error("Failed to parse AI response as JSON. Content snippet: " + content_clean[:500])
             parsed = {"city": "unknown", "places": [], "food": [], "itinerary": []}
+
+        # --- Safety filter: Ensure all places are in India ---
+        def is_foreign_place(place_name: str) -> bool:
+            foreign_keywords = [
+                "Paris", "Rome", "Tokyo", "London", "New York", "Dubai",
+                "Bangkok", "Singapore", "Seoul", "Hong Kong", "Los Angeles",
+                "Chicago", "Berlin", "Madrid", "Toronto", "Sydney", "Melbourne"
+            ]
+            return any(f.lower() in place_name.lower() for f in foreign_keywords)
+
+        filtered_places = [p for p in parsed.get("places", []) if not is_foreign_place(p)]
+        if len(filtered_places) < len(parsed.get("places", [])):
+            logging.warning("🚫 Removed foreign places from Gemini response.")
+        parsed["places"] = filtered_places
+
+        # If all places were foreign and now the list is empty, raise an error.
+        if not parsed.get("places"):
+            logging.error("AI response contained no valid Indian places after filtering.")
+            raise ValueError("Gemini returned only foreign places; ignoring response.")
 
         city = (parsed.get('city') or 'delhi').strip().lower()
         if not city:
@@ -606,9 +724,12 @@ IMPORTANT: Prefer places from the provided database list when possible, but you 
         raw_itinerary = parsed.get('itinerary', []) or []
         itinerary = normalize_itinerary(raw_itinerary) if raw_itinerary else []
 
-        city_obj = City.query.filter(db.func.lower(City.name) == city).first()
+        # Normalize city name to ensure it's India-specific
+        normalized_city_name = normalize_place_name(city).split(',')[0].strip()
+
+        city_obj = City.query.filter(db.func.lower(City.name) == normalized_city_name).first()
         if not city_obj:
-            city_obj = City(name=city.title(), state=None, region=None)
+            city_obj = City(name=city.title(), state="Unknown", region=None)
             db.session.add(city_obj)
             db.session.commit()
             logging.info(f"Created new city record for '{city_obj.name}'")
@@ -620,7 +741,7 @@ IMPORTANT: Prefer places from the provided database list when possible, but you 
             site = db_sites.get(key)
             if site:
                 if site.latitude is None or site.longitude is None:
-                    coords = geocode_place(f"{site.name}, {city_obj.name}, {city_obj.state or ''}")
+                    coords = geocode_place(f"{site.name}, {city_obj.name}")
                     if coords:
                         site.latitude = coords['lat']
                         site.longitude = coords['lng']
@@ -639,7 +760,7 @@ IMPORTANT: Prefer places from the provided database list when possible, but you 
                 else:
                     logging.warning(f"Skipping DB site '{site.name}' due to missing coords after geocode attempt")
             else:
-                coords = geocode_place(f"{place_name}, {city_obj.name}, {city_obj.state or ''}")
+                coords = geocode_place(f"{place_name}, {city_obj.name}")
                 if coords:
                     new_site = Site(
                         name=place_name.strip(),
@@ -671,7 +792,7 @@ IMPORTANT: Prefer places from the provided database list when possible, but you 
             logging.warning("Not enough DB/Gemini combined places resolved; falling back to generic geocoding flow.")
             selected_places = []
             for place_name in places_from_ai:
-                coords = geocode_place(place_name)
+                coords = geocode_place(f"{place_name}, {normalized_city_name}")
                 if coords:
                     details = get_place_details(place_name, coords['lat'], coords['lng'])
                     selected_places.append({'name': place_name, 'lat': coords['lat'], 'lng': coords['lng'], 'details': details})
@@ -778,19 +899,18 @@ IMPORTANT: Prefer places from the provided database list when possible, but you 
             else:
                 seq = place_list
 
-            # Remove duplicates by coordinates, but always keep hotel at start and end
+            # Deduplicate coordinates in seq, but keep hotel at start and end
+            seen_coords = set()
             unique_seq = []
-            seen = set()
             for idx, p in enumerate(seq):
                 if p.get('lat') is None or p.get('lng') is None:
                     continue
                 key = (round(p['lat'], 5), round(p['lng'], 5))
-                # Always allow hotel at start and end, but skip duplicate in between
-                if idx == 0 or idx == len(seq) - 1:
+                # Always allow hotel at start and end
+                if idx == 0 or idx == len(seq) - 1 or key not in seen_coords:
                     unique_seq.append(p)
-                elif key not in seen:
-                    unique_seq.append(p)
-                    seen.add(key)
+                    seen_coords.add(key)
+            seq = unique_seq
 
             if len(unique_seq) < 2:
                 logging.warning(f"Not enough points to route for {day.get('day')}.")
@@ -798,11 +918,11 @@ IMPORTANT: Prefer places from the provided database list when possible, but you 
                 continue
 
             try:
-                route_coords, instructions = calculate_optimal_path(unique_seq, city=city_obj.name + ", India")
+                route_coords, instructions = calculate_optimal_path(unique_seq, city=normalize_place_name(city_obj.name))
             except Exception as e:
                 logging.warning(f"Day routing failed for {day.get('day')}: {e}. Trying fallback using first place.")
                 try:
-                    first_place = unique_seq[0]['name'] if unique_seq else city_obj.name
+                    first_place = normalize_place_name(unique_seq[0]['name'] if unique_seq else city_obj.name)
                     route_coords, instructions = calculate_optimal_path(unique_seq, city=first_place)
                 except Exception as e2:
                     logging.error(f"Fallback routing failed for {day.get('day')}: {e2}")
@@ -1003,6 +1123,13 @@ def get_cities_with_sites():
             })
         result.append(city_dict)
     return jsonify({"cities": result})
+
+
+# Optional: Debug check for tables
+# from sqlalchemy import inspect
+# with app.app_context():
+#     inspector = inspect(db.engine)
+#     print(inspector.get_table_names())
 
 if __name__ == '__main__':
     logging.info("Initializing Flask server...")
