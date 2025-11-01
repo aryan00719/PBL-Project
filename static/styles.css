@@ -924,37 +924,38 @@ textarea:focus-visible {
    🎯 STYLISH ITINERARY SECTION
    =============================== */
 /* Compact, high-contrast itinerary (override / refined */
+/* Enhanced, modern, visually distinct itinerary */
 #itinerary {
-  margin: 8px 0;
-  padding: 8px;
+  margin: 6px 0;
+  padding: 7px;
   max-width: var(--sidebar-width);
-  background: linear-gradient(180deg, #ffffff, #fbfdff);
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(8, 35, 65, 0.04);
+  background: linear-gradient(180deg, #fff, #f9fbff);
+  border-radius: 14px;
+  box-shadow: 0 2px 7px rgba(0, 116, 217, 0.07), 0 1.5px 5px rgba(8, 35, 65, 0.04);
   border: 1px solid rgba(10, 20, 30, 0.04);
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 0.88rem;
-  /* slightly smaller overall */
-  color: #0b0b0b;
-  /* ensure black/dark text in light mode */
+  font-size: 0.87rem;
+  color: #111;
 }
 
 /* Day container */
 .itinerary-day {
-  margin-bottom: 6px;
-  padding: 8px;
+  margin-bottom: 4px;
+  padding: 7px 7px 7px 10px;
   background: transparent;
-  border-left: 3px solid rgba(0, 116, 217, 0.12);
-  border-radius: 6px;
+  border-left: 3px solid rgba(0, 116, 217, 0.13);
+  border-radius: 8px;
 }
 
 /* Day header */
 .itinerary-day h3 {
   color: var(--primary-color);
-  font-size: 0.98rem;
-  margin: 0 0 6px 0;
-  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0 0 4px 0;
+  font-weight: bold;
   line-height: 1.05;
+  letter-spacing: 0.03em;
+  text-transform: none;
 }
 
 /* Compact list */
@@ -962,89 +963,112 @@ textarea:focus-visible {
   list-style: none;
   padding: 0;
   margin: 0;
+  gap: 2px;
 }
 
 /* Compact item style */
 .itinerary-day li {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin: 6px 0;
-  padding: 6px 8px;
-  background: #ffffff;
+  gap: 2px;
+  margin: 3px 0;
+  padding: 5px 7px;
+  background: linear-gradient(180deg, #fff, #f9fbff);
   border: 1px solid rgba(10, 20, 30, 0.04);
-  border-radius: 6px;
-  font-size: 0.86rem;
-  color: #0b0b0b;
-  /* black text */
+  border-radius: 10px;
+  font-size: 0.83rem;
+  color: #111;
   transition: background 0.14s ease, box-shadow 0.14s ease, transform 0.12s ease;
+  box-shadow: 0 1.5px 4px rgba(0, 116, 217, 0.04);
 }
 
 /* Make place name stand out, medium-bold and compact */
 .itinerary-place {
   font-weight: 600;
-  color: #0b0b0b;
-  font-size: 0.92rem;
+  color: #111;
+  font-size: 0.91rem;
   margin: 0;
 }
 
 /* Time and notes smaller and lighter */
-.itinerary-time,
-.itinerary-notes {
+.itinerary-time {
   font-size: 0.74rem;
   color: #6b7280;
   margin: 0;
 }
 
-/* Gentle hover */
+.itinerary-notes {
+  font-size: 0.74rem;
+  color: #5f6368;
+  margin: 0;
+}
+
+/* Gentle hover with blue accent and glow */
 .itinerary-day li:hover {
-  background: rgba(0, 116, 217, 0.04);
-  box-shadow: 0 6px 12px rgba(8, 35, 65, 0.04);
-  transform: translateY(-1px);
+  background: linear-gradient(180deg, #f5faff 90%, #e7f1ff 100%);
+  box-shadow: 0 3px 10px rgba(0, 116, 217, 0.10);
+  transform: scale(1.02);
+  border-color: #b2d7fc;
+  z-index: 2;
 }
 
 /* Tight spacing for very small widths */
 @media (max-width: 540px) {
   #itinerary {
-    padding: 6px;
-    font-size: 0.86rem;
+    padding: 4px;
+    font-size: 0.84rem;
   }
 
   .itinerary-day {
-    padding: 6px;
+    padding: 4px 4px 4px 7px;
   }
 
   .itinerary-day li {
-    padding: 6px;
-    font-size: 0.84rem;
+    padding: 4px 6px;
+    font-size: 0.81rem;
   }
 }
 
-/* Dark mode: preserve compact layout, swap colors for contrast */
+/* Dark mode: polished, blue accents, soft gradients, refined text */
 html.dark #itinerary,
 body.dark-mode #itinerary {
-  background: linear-gradient(180deg, #14161a, #111214);
+  background: linear-gradient(180deg, #1a1d22, #131519);
   border: 1px solid rgba(255, 255, 255, 0.04);
-  color: #eef6ff;
+  color: #d3dae3;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
 }
 
 html.dark .itinerary-day h3,
 body.dark-mode .itinerary-day h3 {
-  color: #6fc0ff;
-  /* pleasant blue in dark mode */
+  color: #4aa8ff;
 }
 
 html.dark .itinerary-day li,
 body.dark-mode .itinerary-day li {
-  background: #16181b;
-  color: #fff;
+  background: linear-gradient(180deg, #1a1d22 90%, #181a1f 100%);
+  color: #d3dae3;
   border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: 0 1.5px 4px rgba(74, 168, 255, 0.04);
+}
+
+html.dark .itinerary-day li:hover,
+body.dark-mode .itinerary-day li:hover {
+  background: linear-gradient(180deg, #232a33 90%, #17202b 100%);
+  box-shadow: 0 3px 10px rgba(74, 168, 255, 0.15);
+  border-color: #4aa8ff;
+}
+
+html.dark .itinerary-place,
+body.dark-mode .itinerary-place {
+  color: #fff;
 }
 
 html.dark .itinerary-time,
-body.dark-mode .itinerary-time,
+body.dark-mode .itinerary-time {
+  color: #9aa6b2;
+}
+
 html.dark .itinerary-notes,
 body.dark-mode .itinerary-notes {
-  color: #9aa6b2;
+  color: #b2b7bd;
 }

@@ -233,6 +233,23 @@ function planRoute() {
   hideLoader();
 }
 
+// 🎨 Color-coded and smooth day-wise routes
+const routeColors = ['#1E90FF', '#32CD32', '#FF8C00', '#FF1493', '#8A2BE2', '#00CED1'];
+
+function drawRouteOnMap(routeGeoJson, dayIndex = 0) {
+  const color = routeColors[dayIndex % routeColors.length];
+  L.geoJSON(routeGeoJson, {
+    style: {
+      color: color,
+      weight: 5,
+      opacity: 0.8,
+      lineJoin: 'round',
+      lineCap: 'round'
+    },
+    smoothFactor: 2
+  }).addTo(map);
+}
+
 // Provide food suggestions along the planned route
 function suggestLocalFood() {
   const foods = [
@@ -630,6 +647,10 @@ async function submitAIPrompt() {
     }
 
 
+    // Draw day-wise colored routes on the map if itinerary is available
+    if (Array.isArray(data.itinerary)) {
+      drawDayWiseRoutes(data.itinerary);
+    }
     hideLoader();
   } catch (err) {
     console.error('AI route fetch failed:', err);
@@ -729,6 +750,16 @@ async function fetchItinerary(places) {
       if (window.itineraryMarkers.length > 0) {
         const group = new L.featureGroup(window.itineraryMarkers);
         map.fitBounds(group.getBounds().pad(0.18));
+      }
+
+      // ---- Draw color-coded and smooth day-wise routes ----
+      if (Array.isArray(data.itinerary)) {
+        data.itinerary.forEach((day, dayIdx) => {
+          // Try to find a route for this day (GeoJSON LineString or array of coordinates)
+          if (day.route) {
+            drawRouteOnMap(day.route, dayIdx);
+          }
+        });
       }
 
       // ---- Collapsible itinerary ----
@@ -1039,6 +1070,48 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleButtonState(); // Initial check
   }
 });
+
+// ---- Draw day-wise colored routes for AI itinerary ----
+function drawDayWiseRoutes(itinerary) {
+  if (!Array.isArray(itinerary)) return;
+
+  const routeColors = ['#1E90FF', '#32CD32', '#FF8C00', '#FF1493', '#8A2BE2', '#00CED1'];
+
+  itinerary.forEach((day, dayIdx) => {
+    const color = routeColors[dayIdx % routeColors.length];
+    let coords = [];
+
+    // Collect valid coordinates for the day's activities or locations
+    const places = Array.isArray(day.activities) ? day.activities : day.locations || [];
+    places.forEach(loc => {
+      if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+        coords.push(L.latLng(loc.lat, loc.lng));
+      }
+    });
+
+    if (coords.length < 2) return;
+
+    // Add color-coded OSRM route for this day's waypoints
+    L.Routing.control({
+      waypoints: coords,
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+      routeWhileDragging: false,
+      addWaypoints: false,
+      draggableWaypoints: false,
+      fitSelectedRoutes: false,
+      createMarker: () => null,
+      lineOptions: {
+        styles: [{ color: color, weight: 5, opacity: 0.9 }]
+      }
+    }).addTo(map);
+  });
+
+  // Fit to all markers if available
+  if (window.aiItineraryMarkers && window.aiItineraryMarkers.length > 0) {
+    const group = new L.featureGroup(window.aiItineraryMarkers);
+    map.fitBounds(group.getBounds().pad(0.15));
+  }
+}
 
 // Ensure the directions panel is visible on page load and update styling for theme changes
 document.addEventListener('DOMContentLoaded', () => {

@@ -1,3 +1,5 @@
+.vscode/
 cache/
 graph_cache/
 .env
+venv/
