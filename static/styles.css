@@ -1,4 +1,5 @@
-/* ====== Global Styles ====== */
+/*
+
 html,
 body {
   margin: 0;
@@ -16,7 +17,7 @@ body {
   --secondary-color: #f5f7fa;
   --secondary-hover: #e2e6ea;
   --accent-color: #3394e6;
-  /* unified accent as lighter shade of primary */
+
   --dark-bg: #181c23;
   --light-bg: #ffffff;
   --dark-text: #f0f0f0;
@@ -34,7 +35,7 @@ body {
   --border-dark: #444;
 }
 
-/* ====== Buttons ====== */
+
 .btn,
 .btn-primary,
 .btn-secondary,
@@ -93,7 +94,7 @@ body {
   gap: 12px;
   justify-content: space-between;
   margin: 56px 0 20px 0;
-  /* Increased from 40px for more space below header */
+
   padding: 0 5px;
 }
 
@@ -105,7 +106,7 @@ body {
   margin: 0;
 }
 
-/* ====== Toggle Button Styling ====== */
+
 .toggle-btn {
   border-radius: 8px;
   padding: 8px 14px;
@@ -124,7 +125,7 @@ body {
   transform: scale(1.04);
 }
 
-/* Dark mode */
+
 html.dark .toggle-btn {
   background: var(--accent-color);
   color: #fff;
@@ -135,7 +136,7 @@ html.dark .toggle-btn:hover {
   color: #fff;
 }
 
-/* ====== Inputs & Checkboxes ====== */
+
 input[type="text"],
 input[type="number"],
 input[type="email"],
@@ -188,7 +189,7 @@ input[type="checkbox"]:checked::after {
   left: 3px;
 }
 
-/* ====== Sidebar ====== */
+
 #sidebar {
   position: fixed;
   top: 0;
@@ -226,7 +227,7 @@ body.sidebar-open {
 
 .sidebar-header h2 {
   font-size: 0.95rem;
-  /* Make header text smaller */
+
   font-weight: bold;
   margin-bottom: 8px;
   color: var(--primary-color);
@@ -272,7 +273,7 @@ body.sidebar-open {
   color: var(--primary-color);
 }
 
-/* ====== Map Area ====== */
+
 #map {
   position: fixed;
   top: 0;
@@ -288,7 +289,7 @@ body.sidebar-open {
   filter: brightness(0.93);
 }
 
-/* ====== Menu Toggle Button ====== */
+
 .menu-toggle {
   position: fixed;
   top: 24px;
@@ -311,20 +312,20 @@ body.sidebar-open {
   transform: scale(1.07);
 }
 
-/* ====== Food List ====== */
+
 #food-list {
   padding-left: 24px;
   margin: 0;
   font-size: 1rem;
 }
 
-/* ====== Popup Header ====== */
+
 .popup-header {
   font-weight: bold;
   margin-bottom: 5px;
 }
 
-/* ====== Itinerary Cards ====== */
+
 .itinerary-cards-container {
   display: flex;
   flex-direction: column;
@@ -364,7 +365,7 @@ body.sidebar-open {
   line-height: 1.5;
 }
 
-/* --- Center and stack Get Recommendations & Find Nearby buttons --- */
+
 .recommendation-actions {
   display: flex;
   flex-direction: column;
@@ -382,7 +383,7 @@ body.sidebar-open {
   text-align: center;
 }
 
-/* Center align Plan Route, Ask AI, and Speak buttons */
+
 .route-planner .btn,
 .route-planner .btn-primary,
 .route-planner .btn-secondary,
@@ -395,13 +396,13 @@ body.sidebar-open {
   text-align: center;
 }
 
-/* Optional: add spacing between stacked buttons in AI prompt */
+
 .ai-prompt .btn-primary,
 .ai-prompt .btn-secondary {
   margin-top: 10px;
 }
 
-/* ====== Responsive Design ====== */
+
 @media (max-width: 900px) {
   #sidebar {
     width: 90vw;
@@ -496,7 +497,7 @@ body.sidebar-open {
     align-items: stretch;
   }
 
-  /* Reduce section width and add horizontal padding for mobile */
+
   .tab-panel {
     max-width: 95vw;
     margin-left: auto;
@@ -518,17 +519,16 @@ body.sidebar-open {
   }
 }
 
-/* Center the View Trip History button */
+
 .button-group {
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 50px 0;
-  /* Remove left/right padding, keep vertical */
   margin-top: auto;
 }
 
-/* Make sure the button itself doesn't stretch */
+
 .button-group .btn,
 .button-group .btn-primary {
   margin: 0;
@@ -536,8 +536,6 @@ body.sidebar-open {
   text-align: center;
 }
 
-/* ====== Theme Toggle Button ====== */
-/* Theme toggle button: light mode - white background, blue text */
 #theme-toggle {
   position: absolute;
   top: 15px;
@@ -560,7 +558,7 @@ body.sidebar-open {
   transform: scale(1.07);
 }
 
-/* Responsive: keep button visible on small screens */
+
 @media (max-width: 600px) {
   #theme-toggle {
     top: 10px;
@@ -570,7 +568,7 @@ body.sidebar-open {
   }
 }
 
-/* Dark mode styles: black background, white text */
+
 html.dark #theme-toggle {
   background: #181c23 !important;
   color: #fff !important;
@@ -585,7 +583,7 @@ html.dark #theme-toggle:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-/* ====== Dark Mode ====== */
+
 html.dark,
 html.dark body,
 body.dark {
@@ -666,7 +664,7 @@ html.dark .itinerary-day {
   color: var(--accent-color);
 }
 
-/* ====== Misc ====== */
+
 #view-history-btn {
   width: 100%;
   margin-top: auto;
@@ -684,7 +682,7 @@ html.dark .itinerary-day {
   transform: scale(1.05);
 }
 
-/* Hide/Show Tab Panels */
+
 .tab-panel {
   display: none;
 }
@@ -693,7 +691,7 @@ html.dark .itinerary-day {
   display: block;
 }
 
-/* Loader Overlay */
+
 #loading-overlay {
   display: none;
   position: fixed;
@@ -709,12 +707,12 @@ html.dark .itinerary-day {
   font-size: 1.5rem;
 }
 
-/* Utility */
+
 .transition-standard {
   transition: background-color var(--transition), color var(--transition), transform var(--transition);
 }
 
-/* Dark Mode Styling for Leaflet Routing Machine */
+
 html.dark .leaflet-routing-container,
 html.dark .leaflet-routing-alt {
   background: #23272f !important;
@@ -747,7 +745,7 @@ html.dark .leaflet-routing-container .leaflet-routing-alt {
 }
 
 
-/* ====== Route Instructions Panel ====== */
+
 #route-instructions {
   position: fixed;
   bottom: 0;
@@ -794,7 +792,7 @@ html.dark .leaflet-routing-container .leaflet-routing-alt {
   flex-shrink: 0;
 }
 
-/* Dark mode styles */
+
 html.dark #route-instructions {
   background-color: #23272f;
   color: var(--dark-text);
@@ -809,7 +807,7 @@ html.dark .instruction-icon {
   color: var(--accent-color);
 }
 
-/* Improve Leaflet Routing Machine directions box (light & dark) */
+
 .leaflet-routing-container {
   max-height: 45vh;
   overflow-y: auto;
@@ -844,8 +842,7 @@ html.dark .instruction-icon {
   border-bottom: none;
 }
 
-/* ====== Custom Map Marker Styles ====== */
-.leaflet-marker-icon.start-pin {
+
   filter: hue-rotate(200deg) brightness(1.2);
 }
 
@@ -859,7 +856,7 @@ html.dark .instruction-icon {
   background-repeat: no-repeat;
 }
 
-/* ====== Enhanced Route Instructions Panel ====== */
+
 #route-instructions {
   border-radius: 12px 12px 0 0;
   font-size: 0.96rem;
@@ -887,7 +884,7 @@ html.dark .instruction-item:hover {
   background-color: rgba(74, 168, 255, 0.12);
 }
 
-/* Dark Mode Scrollbars */
+
 html.dark ::-webkit-scrollbar {
   width: 8px;
 }
@@ -905,7 +902,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: #666;
 }
 
-/* Focus styles for accessibility */
+
 .btn:focus-visible,
 .btn-primary:focus-visible,
 .btn-secondary:focus-visible,
@@ -918,13 +915,6 @@ textarea:focus-visible {
 }
 
 
-
-
-/* ===============================
-   🎯 STYLISH ITINERARY SECTION
-   =============================== */
-/* Compact, high-contrast itinerary (override / refined */
-/* Enhanced, modern, visually distinct itinerary */
 #itinerary {
   margin: 6px 0;
   padding: 7px;
@@ -938,7 +928,7 @@ textarea:focus-visible {
   color: #111;
 }
 
-/* Day container */
+
 .itinerary-day {
   margin-bottom: 4px;
   padding: 7px 7px 7px 10px;
@@ -947,7 +937,7 @@ textarea:focus-visible {
   border-radius: 8px;
 }
 
-/* Day header */
+
 .itinerary-day h3 {
   color: var(--primary-color);
   font-size: 0.95rem;
@@ -958,7 +948,7 @@ textarea:focus-visible {
   text-transform: none;
 }
 
-/* Compact list */
+
 .itinerary-day ul {
   list-style: none;
   padding: 0;
@@ -966,7 +956,7 @@ textarea:focus-visible {
   gap: 2px;
 }
 
-/* Compact item style */
+
 .itinerary-day li {
   display: flex;
   flex-direction: column;
@@ -982,7 +972,7 @@ textarea:focus-visible {
   box-shadow: 0 1.5px 4px rgba(0, 116, 217, 0.04);
 }
 
-/* Make place name stand out, medium-bold and compact */
+
 .itinerary-place {
   font-weight: 600;
   color: #111;
@@ -990,7 +980,7 @@ textarea:focus-visible {
   margin: 0;
 }
 
-/* Time and notes smaller and lighter */
+
 .itinerary-time {
   font-size: 0.74rem;
   color: #6b7280;
@@ -1003,7 +993,7 @@ textarea:focus-visible {
   margin: 0;
 }
 
-/* Gentle hover with blue accent and glow */
+
 .itinerary-day li:hover {
   background: linear-gradient(180deg, #f5faff 90%, #e7f1ff 100%);
   box-shadow: 0 3px 10px rgba(0, 116, 217, 0.10);
@@ -1012,7 +1002,7 @@ textarea:focus-visible {
   z-index: 2;
 }
 
-/* Tight spacing for very small widths */
+
 @media (max-width: 540px) {
   #itinerary {
     padding: 4px;
@@ -1029,7 +1019,7 @@ textarea:focus-visible {
   }
 }
 
-/* Dark mode: polished, blue accents, soft gradients, refined text */
+
 html.dark #itinerary,
 body.dark-mode #itinerary {
   background: linear-gradient(180deg, #1a1d22, #131519);
@@ -1071,4 +1061,236 @@ body.dark-mode .itinerary-time {
 html.dark .itinerary-notes,
 body.dark-mode .itinerary-notes {
   color: #b2b7bd;
+}
+
+*/
+
+/* ===============================
+   GLOBAL VARIABLES & BASE
+   =============================== */
+
+:root {
+  --primary: #0074D9;
+  --primary-hover: #005fa3;
+  --bg-light: #ffffff;
+  --bg-dark: #181c23;
+  --text-light: #111111;
+  --text-dark: #f0f0f0;
+  --card-bg: #f8f9fb;
+  --border-light: #e0e0e0;
+  --border-dark: #3a3a3a;
+  --shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-light);
+  color: var(--text-light);
+}
+
+/* ===============================
+   LAYOUT
+   =============================== */
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 100vh;
+  padding: 18px;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border-light);
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.map-container {
+  position: fixed;
+  top: 0;
+  left: 320px;
+  right: 0;
+  bottom: 0;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+}
+
+/* ===============================
+   BUTTONS
+   =============================== */
+
+button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+  background: var(--primary);
+  color: #fff;
+}
+
+button:hover {
+  background: var(--primary-hover);
+}
+
+/* ===============================
+   INPUTS
+   =============================== */
+
+input, textarea {
+  width: 100%;
+  padding: 7px 10px;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  font-size: 0.9rem;
+}
+
+/* ===============================
+   ITINERARY (FINAL CLEAN VERSION)
+   =============================== */
+
+#itinerary {
+  margin-top: 14px;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+  color: #111;
+}
+
+.itinerary-day {
+  margin-bottom: 12px;
+}
+
+.itinerary-day h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: var(--primary);
+}
+
+.itinerary-day ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.itinerary-day li {
+  padding: 7px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  border: 1px solid rgba(0,0,0,0.05);
+  font-size: 0.83rem;
+  color: #111;
+}
+
+.itinerary-place {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.itinerary-time {
+  font-size: 0.74rem;
+  color: #555;
+}
+
+.itinerary-notes {
+  font-size: 0.74rem;
+  color: #666;
+}
+
+/* ===============================
+   ROUTE INSTRUCTIONS
+   =============================== */
+
+#route-instructions {
+  position: fixed;
+  bottom: 0;
+  left: 320px;
+  right: 0;
+  max-height: 45vh;
+  background: #ffffff;
+  padding: 12px 18px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-light);
+  box-shadow: 0 -3px 14px rgba(0,0,0,0.2);
+  z-index: 900;
+}
+
+#route-instructions h3 {
+  margin-top: 0;
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.instruction-item {
+  font-size: 0.85rem;
+  margin: 6px 0;
+}
+
+/* ===============================
+   DARK MODE
+   =============================== */
+
+html.dark body {
+  background: var(--bg-dark);
+  color: var(--text-dark);
+}
+
+html.dark .sidebar {
+  background: #23272f;
+  border-right: 1px solid var(--border-dark);
+}
+
+html.dark #itinerary {
+  background: #1e2228;
+  color: #eaeaea;
+}
+
+html.dark .itinerary-day li {
+  background: #2a2f38;
+  color: #eaeaea;
+}
+
+html.dark .itinerary-time,
+html.dark .itinerary-notes {
+  color: #b0b0b0;
+}
+
+html.dark #route-instructions {
+  background: #23272f;
+  color: #f0f0f0;
+  border-top: 1px solid var(--border-dark);
+}
+
+/* ===============================
+   RESPONSIVE
+   =============================== */
+
+@media (max-width: 700px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+
+  .map-container {
+    left: 0;
+    top: 60vh;
+  }
+
+  #route-instructions {
+    left: 0;
+  }
 }

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!--<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -13,7 +13,7 @@
   <meta name="theme-color" content="#0074D9" />
   <title>AI-Driven Travel Itennary Planner & Map</title>
 
-  <!-- Theme Toggle Script -->
+
   <script>
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (prefersDark) document.documentElement.classList.add('dark');
@@ -30,14 +30,14 @@
     };
   </script>
 
-  <!-- Leaflet & Routing Styles -->
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
-  <!-- FontAwesome -->
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
-  <!-- Custom Styles -->
+
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <style>
     body {
@@ -60,7 +60,8 @@
       <div class="tab-buttons">
         <button class="tab-button active" onclick="showTab('preferences', event)">Select Your Interests</button>
         <button class="tab-button" onclick="showTab('route', event)">Plan Route</button>
-        <button class="tab-button" onclick="showTab('ai', event)">Ask AI</button>
+
+        <button id="submit-button" onclick="handleRoute()">Plan Trip</button>
       </div>
 
       <div class="tab-panel" id="tab-preferences" style="display: block;">
@@ -125,7 +126,7 @@
         <div class="itinerary-section" id="itinerary-section" style="display: none;">
           <h3>Itinerary Plan</h3>
           <div id="itinerary-cards" class="itinerary-cards-container">
-            <!-- Collapsible day-wise itinerary will be injected here by script.js -->
+
           </div>
         </div>
       </div>
@@ -158,7 +159,7 @@
     <div id="map"></div>
   </main>
 
-  <!-- Leaflet & Routing Scripts -->
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
 
@@ -176,7 +177,7 @@
     </div>
   </div>
 
-  <!-- Custom Script -->
+
   <script src="{{ url_for('static', filename='script.js') }}"></script>
   <script>
     function startVoiceInput() {
@@ -212,7 +213,7 @@
     }
   </script>
 
-  <!-- Popup template for showing place details on map pin click -->
+
   <div id="place-popup-template" style="display: none;">
     <div class="place-popup">
       <h4 id="place-name">Place Name</h4>
@@ -223,6 +224,97 @@
       <p><strong>Ticket Price:</strong> <span id="place-price">₹100</span></p>
     </div>
   </div>
+</body>
+
+</html>
+ -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Travel Itinerary Planner & Map</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f4f6f8;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <h1>🧭 Travel Itinerary Planner</h1>
+    <p>Database-Driven Route Planning (AI-Free)</p>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="sidebar-section">
+      <h3>Plan Your Trip</h3>
+
+      <label for="priority-input">Enter City Name</label>
+      <input id="priority-input" type="text" placeholder="e.g. Jaipur" />
+
+      <button class="btn-primary" onclick="handleRoute()">
+        Plan Trip
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>📅 Itinerary</h3>
+      <div id="itinerary">
+        <!-- Day-wise itinerary injected here -->
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- MAP -->
+  <main class="map-container">
+    <div id="map"></div>
+  </main>
+
+  <!-- LOADER -->
+  <div id="loading-overlay" style="
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.5rem;
+    ">
+    Loading route, please wait...
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Custom JS -->
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+
 </body>
 
 </html>
