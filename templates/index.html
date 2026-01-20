@@ -1,234 +1,3 @@
-<!--<!DOCTYPE html>
-<html lang="en">
-
-<head>
-  <script>
-    if (location.protocol === "file:" || (location.hostname === "127.0.0.1" && location.port !== "5050")) {
-      alert("⚠️ Please run this app using the Flask server (http://localhost:5050), not by opening the HTML file directly.");
-      document.body.innerHTML = "<h2 style='color:red; text-align:center;'>Please run the app via Flask at http://localhost:5050</h2>";
-    }
-  </script>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0074D9" />
-  <title>AI-Driven Travel Itennary Planner & Map</title>
-
-
-  <script>
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (prefersDark) document.documentElement.classList.add('dark');
-
-    function toggleTheme() {
-      document.documentElement.classList.toggle('dark');
-      localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-    }
-
-    window.onload = () => {
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme === 'dark') document.documentElement.classList.add('dark');
-      else document.documentElement.classList.remove('dark');
-    };
-  </script>
-
-
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-
-
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-  <style>
-    body {
-      background-color: var(--background-color, #f0f0f0);
-      background-size: cover;
-      background-repeat: repeat;
-    }
-  </style>
-</head>
-
-<body>
-  <header style="background-color: #0074D9; color: white; padding: 15px; text-align: center; position: relative;">
-    <h1 style="margin: 0;">AI-Powered Travel Planner</h1>
-    <button id="theme-toggle" onclick="toggleTheme()">🌓 Theme</button>
-  </header>
-  <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-
-  <div id="sidebar" class="sidebar responsive-sidebar">
-    <div class="sidebar-content">
-      <div class="tab-buttons">
-        <button class="tab-button active" onclick="showTab('preferences', event)">Select Your Interests</button>
-        <button class="tab-button" onclick="showTab('route', event)">Plan Route</button>
-
-        <button id="submit-button" onclick="handleRoute()">Plan Trip</button>
-      </div>
-
-      <div class="tab-panel" id="tab-preferences" style="display: block;">
-        <div class="sidebar-header">
-          <h2>Customize Your Journey</h2>
-        </div>
-
-        <p style="font-size: 0.9rem; color: gray; margin-bottom: 5px;">Choose attraction types you'd like to explore:
-        </p>
-        <div class="preference-group">
-          <div class="preference-item">
-            <input type="checkbox" class="category" value="culture" id="culture" />
-            <label for="culture"><i class="fas fa-landmark"></i> Cultural Sites</label>
-          </div>
-          <div class="preference-item">
-            <input type="checkbox" class="category" value="food" id="food" />
-            <label for="food"><i class="fas fa-utensils"></i> Restaurants</label>
-          </div>
-          <div class="preference-item">
-            <input type="checkbox" class="category" value="adventure" id="adventure" />
-            <label for="adventure"><i class="fas fa-hiking"></i> Adventure Spots</label>
-          </div>
-          <div class="preference-item">
-            <input type="checkbox" class="category" value="shopping" id="shopping" />
-            <label for="shopping"><i class="fas fa-shopping-bag"></i> Shopping</label>
-          </div>
-          <div class="preference-item">
-            <input type="checkbox" class="category" value="nature" id="nature" />
-            <label for="nature"><i class="fas fa-tree"></i> Nature</label>
-          </div>
-        </div>
-
-        <div class="recommendation-actions">
-          <button class="btn-secondary" onclick="getRecommendations()">
-            <i class="fas fa-map-marker-alt"></i> Get Recommendations
-          </button>
-          <button class="btn-primary" onclick="findNearby()">
-            <i class="fas fa-location-arrow"></i> Find Nearby
-          </button>
-        </div>
-      </div>
-
-      <div class="tab-panel" id="tab-route">
-        <div class="hotel-selection">
-          <h3>🏨 Set Your Hotel Location</h3>
-          <p style="font-size: 0.9rem; color: gray;">Click the button and then click on your hotel’s location on the
-            map.</p>
-          <button class="btn-secondary" onclick="enableHotelSelection()">Set Hotel Location</button>
-          <p id="hotel-status" style="margin-top: 8px; color: #555;">No hotel set yet.</p>
-        </div>
-        <div class="route-planner">
-          <h2>Plan Your Route</h2>
-          <label for="priority-input">Enter places in order:</label>
-          <input type="text" id="priority-input" aria-label="Manual route entry input"
-            placeholder="e.g. Jaipur, Agra, Delhi" />
-          <button class="btn-primary" onclick="planRoute()">Plan Route</button>
-        </div>
-        <div class="food-suggestions" id="food-section" style="display: none;">
-          <h3>Food & Items Along the Route</h3>
-          <ul id="food-list"></ul>
-        </div>
-        <div class="itinerary-section" id="itinerary-section" style="display: none;">
-          <h3>Itinerary Plan</h3>
-          <div id="itinerary-cards" class="itinerary-cards-container">
-
-          </div>
-        </div>
-      </div>
-
-      <div class="tab-panel" id="tab-ai">
-        <div class="ai-prompt">
-          <h2>Ask AI to Plan Your Trip</h2>
-          <input type="text" id="ai-prompt-input" aria-label="AI travel planner prompt input"
-            placeholder="e.g. Plan a Delhi trip with historical sites and street food" />
-          <button class="btn-primary" onclick="submitAIPrompt()">Ask AI</button>
-          <button onclick="startVoiceInput()" class="btn-secondary" aria-label="Voice input for AI prompt">
-            <i class="fas fa-microphone"></i> Speak
-          </button>
-          <div class="itinerary-section" id="ai-itinerary-section" style="display: none;">
-            <h3>AI-Generated Itinerary Plan</h3>
-            <div id="ai-itinerary-cards" class="itinerary-cards-container"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="button-group" style="margin-top: auto ; padding: 50px;">
-      <button class="btn-primary" onclick="window.location.href='/history'">
-        <i class="fas fa-clock-rotate-left"></i> View Trip History
-      </button>
-    </div>
-  </div>
-
-  <main role="main">
-    <div id="map"></div>
-  </main>
-
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
-
-  <div id="loading-overlay"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99999; align-items:center; justify-content:center; color:white; font-size:1.5rem;">
-    Loading, please wait...
-  </div>
-
-  <div class="instruction-container">
-    <div class="instruction-toggle">
-      <button class="toggle-btn" onclick="toggleInstructions()">🧭 Show/Hide Instructions</button>
-      <div class="panel-body" id="instruction-panel">
-        <ul id="instruction-list"></ul>
-      </div>
-    </div>
-  </div>
-
-
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
-  <script>
-    function startVoiceInput() {
-      if (!('webkitSpeechRecognition' in window)) {
-        alert('Speech recognition not supported in this browser.');
-        return;
-      }
-      const recognition = new webkitSpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      recognition.onresult = function (event) {
-        document.getElementById('ai-prompt-input').value = event.results[0][0].transcript;
-      };
-      recognition.start();
-    }
-  </script>
-  <script>
-    function showLoader() {
-      document.getElementById('loading-overlay').style.display = 'flex';
-    }
-
-    function hideLoader() {
-      document.getElementById('loading-overlay').style.display = 'none';
-    }
-  </script>
-  <script>
-    function showTab(tab, event) {
-      document.querySelectorAll('.tab-panel').forEach(panel => panel.style.display = 'none');
-      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-      document.getElementById(`tab-${tab}`).style.display = 'block';
-      if (event) event.target.classList.add('active');
-    }
-  </script>
-
-
-  <div id="place-popup-template" style="display: none;">
-    <div class="place-popup">
-      <h4 id="place-name">Place Name</h4>
-      <img id="place-photo" src="" alt="Place photo"
-        style="width: 100%; max-height: 150px; object-fit: cover; margin-bottom: 10px;">
-      <p id="place-description">Short description about the place.</p>
-      <p><strong>Visit Time:</strong> <span id="place-time">10 AM - 5 PM</span></p>
-      <p><strong>Ticket Price:</strong> <span id="place-price">₹100</span></p>
-    </div>
-  </div>
-</body>
-
-</html>
- -->
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -237,82 +6,76 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Travel Itinerary Planner & Map</title>
 
-  <!-- Leaflet CSS -->
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: #f4f6f8;
-    }
-  </style>
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
 <body>
+  <div class="app-layout">
 
-  <!-- HEADER -->
-  <header class="app-header">
-    <h1>🧭 Travel Itinerary Planner</h1>
-    <p>Database-Driven Route Planning (AI-Free)</p>
-  </header>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-card">
+        <h3><i class="fa-solid fa-compass"></i> Where to next?</h3>
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
+        <label for="priority-input">City or Destination</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-magnifying-glass input-icon"></i>
+          <input id="priority-input" type="text" placeholder="e.g. Jaipur" autocomplete="off"
+            aria-label="Destination city" />
+        </div>
 
-    <div class="sidebar-section">
-      <h3>Plan Your Trip</h3>
-
-      <label for="priority-input">Enter City Name</label>
-      <input id="priority-input" type="text" placeholder="e.g. Jaipur" />
-
-      <button class="btn-primary" onclick="handleRoute()">
-        Plan Trip
-      </button>
-    </div>
-
-    <div class="sidebar-section">
-      <h3>📅 Itinerary</h3>
-      <div id="itinerary">
-        <!-- Day-wise itinerary injected here -->
+        <button type="button" class="btn-primary" onclick="handleRoute()">
+          Plan My Trip <i class="fa-solid fa-arrow-right"></i>
+        </button>
       </div>
-    </div>
 
-  </aside>
+      <!-- ITINERARY -->
+      <div class="itinerary-container">
+        <div class="section-header">
+          <h3>Your Itinerary</h3>
+          <span class="badge">Draft</span>
+        </div>
 
-  <!-- MAP -->
-  <main class="map-container">
-    <div id="map"></div>
-  </main>
+        <div id="itinerary" class="itinerary-list" aria-live="polite">
+          <div class="empty-state">
+            <p>Enter a city to generate your itinerary.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
 
-  <!-- LOADER -->
-  <div id="loading-overlay" style="
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.6);
-      z-index: 9999;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 1.5rem;
-    ">
-    Loading route, please wait...
+    <!-- MAP -->
+    <main class="map-container" role="main">
+      <div id="map"></div>
+
+      <div id="route-instructions" class="hidden">
+        <h3><i class="fa-solid fa-diamond-turn-right"></i> Navigation</h3>
+        <div id="instruction-list"></div>
+      </div>
+    </main>
+
   </div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- LOADER -->
+  <div id="loading-overlay">
+    <div class="spinner-box">
+      <div class="spinner"></div>
+      <p>Optimizing route…</p>
+    </div>
+  </div>
 
-  <!-- Custom JS -->
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 
 </body>
