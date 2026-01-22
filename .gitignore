@@ -1,10 +1,20 @@
+# Editor & OS
 .vscode/
+.DS_Store
+
+# Python
+venv/
+__pycache__/
+.env
+*.log
+*.tmp
+
+# App runtime & data
 cache/
 graph_cache/
-.env
-venv/
+*.graphml
 instance/
 *.db
-__pycache__/
 
+# Archived / old work
 archive/
