@@ -66,6 +66,15 @@ class Site(db.Model):
 
     city = db.relationship("City", back_populates="sites")
 
+class Trip(db.Model):
+    __tablename__ = "trips"
+
+    id = db.Column(db.Integer, primary_key=True)
+    city = db.Column(db.String(100), nullable=False)
+    days = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    data = db.Column(db.Text)
+
 
 # ------------------ GRAPH CACHE ------------------
 
@@ -182,6 +191,10 @@ def generate_procedural_itinerary(city_name, days):
 def home():
     return render_template("index.html")
 
+@app.route("/history")
+def history():
+    trips = Trip.query.order_by(Trip.created_at.desc()).all()
+    return render_template("history.html", trips=trips)
 
 @app.route("/api/db-route", methods=["POST"])
 def db_route():
@@ -225,6 +238,14 @@ def db_route():
             "route": route,
             "instructions": instructions
         })
+
+    trip = Trip(
+        city=city,
+        days=days,
+        data=json.dumps(day_routes)
+    )
+    db.session.add(trip)
+    db.session.commit()
 
     return jsonify({"status": "success", "days": day_routes})
 

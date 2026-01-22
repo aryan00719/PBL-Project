@@ -120,6 +120,29 @@ input:focus {
   transform: translateY(-1px);
 }
 
+.btn-secondary {
+  margin-top: 10px;
+  width: 100%;
+  padding: 11px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb;
+  transform: translateY(-1px);
+}
+
 /* =======================
    ITINERARY
 ======================= */
@@ -273,4 +296,88 @@ input:focus {
     border-right: none;
     border-top: 1px solid var(--border);
   }
+}
+
+/* ===============================
+   HISTORY PAGE
+   =============================== */
+
+.history-page {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.history-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.history-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.trip-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.trip-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.trip-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.trip-city {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.trip-prompt {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.trip-detail {
+  font-size: 0.85rem;
+  margin-top: 6px;
+  color: var(--text-main);
+}
+
+.trip-itinerary {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.trip-itinerary ul {
+  padding-left: 18px;
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.no-trips {
+  text-align: center;
+  color: var(--text-muted);
+  margin-top: 40px;
+}
+
+.history-footer {
+  margin-top: 24px;
+  text-align: center;
 }

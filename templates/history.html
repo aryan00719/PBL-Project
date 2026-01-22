@@ -5,146 +5,48 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Trip History</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #e0f2f1, #f4f6f8);
-            margin: 0;
-            padding: 2rem 1rem;
-            color: #333;
-        }
 
-        h1 {
-            text-align: center;
-            color: #264653;
-            font-size: 2.4rem;
-            font-weight: 700;
-            margin-bottom: 2.5rem;
-            letter-spacing: 0.05em;
-        }
-
-        .trip {
-            background: white;
-            padding: 1rem 1.5rem;
-            margin: 1rem auto;
-            max-width: 800px;
-            border-radius: 15px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .trip:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
-        }
-
-        .trip strong {
-            font-size: 1.5rem;
-            display: block;
-            color: #2a9d8f;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            letter-spacing: 0.03em;
-        }
-
-        .trip em {
-            color: #6c757d;
-            font-style: normal;
-            display: block;
-            margin-bottom: 0.8rem;
-            font-weight: 500;
-        }
-
-        .trip br {
-            line-height: 1.8;
-        }
-
-        .trip .details {
-            font-size: 1.1rem;
-            color: #495057;
-            margin-bottom: 0.5rem;
-        }
-
-        .trip .itinerary {
-            margin-top: 1rem;
-        }
-
-        .trip .itinerary strong {
-            font-weight: 600;
-            color: #264653;
-            display: block;
-            margin-bottom: 0.6rem;
-        }
-
-        .trip .itinerary ul {
-            margin: 0;
-            padding-left: 1.2rem;
-            list-style: none;
-            border-left: 3px solid #2a9d8f;
-        }
-
-        .trip .itinerary ul li {
-            font-size: 0.9rem;
-            color: #7a8a8f;
-            margin-bottom: 0.4rem;
-            padding-left: 0.8rem;
-            font-weight: 400;
-        }
-
-        a.btn-primary {
-            display: inline-block;
-            background-color: #2a9d8f;
-            color: white;
-            padding: 0.7rem 1.6rem;
-            border-radius: 12px;
-            font-weight: 700;
-            text-decoration: none;
-            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-            box-shadow: 0 4px 10px rgba(42, 157, 143, 0.4);
-        }
-
-        a.btn-primary:hover {
-            background-color: #21867a;
-            transform: scale(1.07);
-            box-shadow: 0 6px 14px rgba(33, 134, 122, 0.6);
-        }
-
-        p {
-            font-size: 1.2rem;
-            color: #555;
-            text-align: center;
-            margin-top: 3rem;
-        }
-    </style>
+    <!-- Shared App Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
 <body>
-    <h1>Recent Trips</h1>
-    {% for trip in trips %}
-    <div class="trip">
-        <strong>{{ trip.city.upper() }}</strong><br />
-        <em>{{ trip.prompt }}</em><br />
-        <div class="details">🏛️ {{ trip.places|join(', ') }}</div>
-        <div class="details">🍽️ {{ trip.food|join(', ') }}</div>
-        <div class="details">🕒 {{ trip.timestamp }}</div>
+    <div class="history-page">
 
-        {% if trip.itinerary %}
-        <div class="itinerary">
-            <strong>📅 Itinerary:</strong>
-            <ul>
-                {% for step in trip.itinerary %}
-                <li>{{ step }}</li>
-                {% endfor %}
-            </ul>
+        <h1 class="history-title">Trip History</h1>
+        <p class="history-subtitle">Previously planned routes</p>
+
+        {% for trip in trips %}
+        <div class="trip-card">
+            <div class="trip-header">
+                <strong class="trip-city">{{ trip.city.upper() }}</strong>
+                <em class="trip-prompt">{{ trip.prompt }}</em>
+            </div>
+
+            <div class="trip-detail">🏛️ {{ trip.places | join(', ') }}</div>
+            <div class="trip-detail">🍽️ {{ trip.food | join(', ') }}</div>
+            <div class="trip-detail">🕒 {{ trip.timestamp }}</div>
+
+            {% if trip.itinerary %}
+            <div class="trip-itinerary">
+                <strong>📅 Itinerary</strong>
+                <ul>
+                    {% for step in trip.itinerary %}
+                    <li>{{ step }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
+        {% else %}
+        <p class="no-trips">No trips saved yet.</p>
+        {% endfor %}
+
+        <div class="history-footer">
+            <a href="/" class="btn-primary">← Back to Map</a>
+        </div>
+
     </div>
-    {% else %}
-    <p>No trips saved yet.</p>
-    {% endfor %}
 </body>
-<div style="text-align: center; margin-top: 2rem;">
-    <a href="/" class="btn-primary" style="text-decoration: none;">← Back to Map</a>
-</div>
 
 </html>
