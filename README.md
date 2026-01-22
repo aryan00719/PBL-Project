@@ -1,13 +1,117 @@
-# PBL-Project
+# Travel Itinerary Planner & Route Visualization System
 
-AI-Driven Maps for an Immersive Tourism Experience 
+## Overview
 
-The tourism industry is evolving with a growing demand for personalized and immersive travel experiences. Current digital tools, while effective, often fall short in delivering dynamic and context-aware solutions. This project, titled "AI-Driven Maps for an Immersive Tourism Experience," proposes integrating artificial intelligence and augmented reality to address these gaps. The AI-powered system will deliver personalized recommendations, optimized routes, and real-time updates based on user preferences, traffic, and environmental factors. AR features will enhance engagement by overlaying cultural, historical, and contextual information onto maps. By combining machine learning, real-time data integration, and interactive design, the platform aims to redefine how travelers explore and experience new destinations, ensuring seamless, enriching, and adaptive journeys.
+This project is a database-driven travel itinerary planner that generates
+structured, multi-day travel plans for a city and visualizes optimized routes
+on an interactive map.
 
-Functional Requirements:-
+Unlike AI-generated systems, this application follows a **procedural,
+deterministic approach**, ensuring reproducible and explainable outputs.
 
-User Account Management: Allow users to create, edit, and manage profiles, including preferences for types of attractions, cuisines, and    travel modes.
-Personalized Recommendations: Use machine learning to suggest points of interest (POIs) such as cultural sites, restaurants, and adventure spots based on user preferences.
-Route Optimization: Calculate eﬃcient travel routes based on real-time traﬃc, distance, and user preferences. Provide multiple options like fastest, scenic, or cultural routes.
-Interactive Map Features: Zoomable, scrollable, and interactive map interface to explore destinations. Highlight important locations with rich tooltips or pop-ups containing detailed information.
-Itinerary Planning: Allow users to plan and save their travel itinerary with time-optimized schedules.
+---
+
+## System Architecture
+
+### Backend
+
+- Flask-based REST API
+- SQLite database for persistent city and site data
+- Procedural itinerary generation logic
+- Graph-based route computation using OpenStreetMap data
+
+### Frontend
+
+- Interactive map visualization using Leaflet.js
+- Animated route drawing
+- Timeline-style itinerary display
+- Navigation instruction summary panel
+
+---
+
+## Core Features
+
+1. **City & Location Database**
+   - Cities and tourist locations stored persistently
+   - Easy expansion via database population scripts
+
+2. **Procedural Itinerary Generation**
+   - Automatically groups locations into day-wise plans
+   - Fixed rules ensure consistency and predictability
+
+3. **Graph-Based Route Computation**
+   - Uses road network graphs for route calculation
+   - Includes graceful fallback when routes are unavailable
+
+4. **Interactive Visualization**
+   - Animated route drawing
+   - Map markers and bounds adjustment
+   - Clean, modern UI for itinerary presentation
+
+---
+
+## Why This Is Not an AI-Based System
+
+This project intentionally avoids AI-generated content to:
+
+- Ensure deterministic outputs
+- Improve explainability
+- Enable consistent evaluation
+- Support patentability and reproducibility
+
+---
+
+## Technologies Used
+
+- Python (Flask, SQLAlchemy)
+- SQLite
+- OpenStreetMap / OSMnx
+- NetworkX
+- Leaflet.js
+- HTML, CSS, JavaScript
+
+---
+
+## Novelty & Contribution
+
+This system introduces a deterministic, database-driven approach to
+multi-day travel itinerary generation combined with graph-based
+route visualization.
+
+Key novel aspects include:
+
+- Rule-based itinerary generation without AI dependence
+- Tight integration of persistent city databases with live road graphs
+- Graceful fallback routing strategies for disconnected graphs
+- Deterministic outputs suitable for academic evaluation and patent filing
+
+---
+
+## Scope of Protection
+
+The following components are intended for copyright and/or patent protection:
+
+- Procedural itinerary generation logic
+- Database schema and data organization strategy
+- Route computation and fallback algorithms
+- Frontend visualization workflow and interaction model
+
+---
+
+## Note
+
+Graph cache files are generated locally and are not part of the core source code.s
+
+---
+
+## License
+
+License to be determined.
+All rights reserved © 2026 Aryan Mishra.
+
+---
+
+## Author
+
+Aryan Mishra  
+B.Tech CSE – Manipal University Jaipur

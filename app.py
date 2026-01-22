@@ -1,3 +1,21 @@
+"""
+AI Travel Itinerary Planner & Route Visualization System
+--------------------------------------------------------
+
+This application implements a database-driven procedural
+itinerary generation system combined with graph-based
+route computation and interactive map visualization.
+
+Key Features:
+- Persistent city and site database
+- Procedural multi-day itinerary generation
+- OpenStreetMap-based route computation with fallback handling
+- Web-based interactive route visualization
+
+This system intentionally avoids AI-based generation to ensure
+deterministic, explainable, and reproducible itinerary outputs.
+"""
+
 from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -87,7 +105,11 @@ def get_cached_graph(city_name):
 
 # ------------------ ROUTING ------------------
 
-def calculate_route(places, city):
+def compute_route_between_places(places, city):
+    """
+    Computes an optimal travel route between a sequence of places
+    using a road network graph, with graceful fallback handling.
+    """
     G = get_cached_graph(city)
 
     route_coords = []
@@ -112,8 +134,9 @@ def calculate_route(places, city):
                 instructions.append(f"Go from {o['name']} to {d['name']}")
 
         except Exception as e:
-            logging.info(
-                f"Fallback route used between {o['name']} and {d['name']}"
+            logging.warning(
+                f"Routing fallback activated between {o['name']} and {d['name']}: "
+                "no valid graph path found"
             )
 
             # 🔁 Fallback: straight line
@@ -127,7 +150,11 @@ def calculate_route(places, city):
 
 # ------------------ ITINERARY (PROCEDURAL) ------------------
 
-def generate_itinerary_from_db(city_name, days):
+def generate_procedural_itinerary(city_name, days):
+    """
+    Generates a structured multi-day itinerary by grouping
+    location entities retrieved from a persistent database.
+    """
     city = City.query.filter(db.func.lower(City.name) == city_name.lower()).first()
     if not city:
         raise ValueError("City not found")
@@ -158,6 +185,12 @@ def home():
 
 @app.route("/api/db-route", methods=["POST"])
 def db_route():
+    """
+    API endpoint that accepts a city name and number of days,
+    generates a procedural itinerary from the database,
+    computes routes for each day, and returns structured
+    route and instruction data for visualization.
+    """
     data = request.get_json()
     city = data.get("city")
     days = int(data.get("days", 3))
@@ -165,7 +198,7 @@ def db_route():
     if not city:
         return jsonify({"error": "City required"}), 400
 
-    itinerary = generate_itinerary_from_db(city, days)
+    itinerary = generate_procedural_itinerary(city, days)
     day_routes = []
 
     for day in itinerary:
@@ -184,7 +217,7 @@ def db_route():
             })
             continue
 
-        route, instructions = calculate_route(places, city)
+        route, instructions = compute_route_between_places(places, city)
 
         day_routes.append({
             "day": day["day"],
