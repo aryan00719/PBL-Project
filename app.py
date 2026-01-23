@@ -50,7 +50,6 @@ class City(db.Model):
     region = db.Column(db.String(100))
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
-
     sites = db.relationship("Site", back_populates="city", lazy=True)
 
 
@@ -63,12 +62,10 @@ class Site(db.Model):
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
     city_id = db.Column(db.Integer, db.ForeignKey("cities.id"))
-
     city = db.relationship("City", back_populates="sites")
 
 class Trip(db.Model):
     __tablename__ = "trips"
-
     id = db.Column(db.Integer, primary_key=True)
     city = db.Column(db.String(100), nullable=False)
     days = db.Column(db.Integer, nullable=False)
@@ -140,7 +137,7 @@ def compute_route_between_places(places, city):
 
             if segment:
                 route_coords.extend(segment)
-                instructions.append(f"Go from {o['name']} to {d['name']}")
+                instructions.append("Travel from place A to place B")
 
         except Exception as e:
             logging.warning(
@@ -152,7 +149,7 @@ def compute_route_between_places(places, city):
             route_coords.append([o["lat"], o["lng"]])
             route_coords.append([d["lat"], d["lng"]])
             instructions.append(
-                f"Go from {o['name']} to {d['name']} (direct)"
+                "Travel directly between two locations"
             )
 
     return route_coords, instructions
