@@ -12,10 +12,8 @@ def populate_jaipur_data():
         if not city:
             city = City(
                 name="Jaipur",
-                state="Rajasthan",
-                region="North India",
-                latitude=26.9124,
-                longitude=75.7873,
+                lat=26.9124,
+                lng=75.7873,
             )
             db.session.add(city)
             db.session.commit()
@@ -117,8 +115,6 @@ def populate_jaipur_data():
             db_place = Site(
                 city_id=city.id,
                 name=place["name"],
-                category=place["category"],
-                description=place["description"],
                 latitude=place["latitude"],
                 longitude=place["longitude"],
             )

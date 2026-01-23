@@ -45,10 +45,12 @@ async function handleRoute() {
   }
 
   const city = input.value.trim();
-  const days = 3; // fixed for now (safe & simple)
+  const days = 3;
 
   fetchDBRoute(city, days);
 }
+
+/* ---------------- ANIMATED POLYLINE ---------------- */
 
 function animatePolyline(latLngs, options = {}) {
   const {
@@ -61,7 +63,9 @@ function animatePolyline(latLngs, options = {}) {
   const animatedLine = L.polyline([], {
     color,
     weight,
-    opacity: 0.9
+    opacity: 0.9,
+    lineCap: "round",
+    lineJoin: "round"
   }).addTo(map);
 
   const interval = setInterval(() => {
@@ -89,39 +93,26 @@ async function fetchDBRoute(city, days) {
       body: JSON.stringify({ city, days })
     });
 
-    if (!res.ok) {
-      throw new Error("Backend error");
-    }
+    if (!res.ok) throw new Error("Backend error");
 
-    let data;
-    try {
-      data = await res.json();
-    } catch {
-      throw new Error("Backend did not return JSON");
-    }
+    const data = await res.json();
 
     if (!data || data.status !== "success" || !Array.isArray(data.days)) {
-      console.error("Bad backend response:", data);
       alert("Could not load itinerary data");
-      hideLoader();
       return;
     }
 
-    if (markers.length === 0 && data.city && data.city.lat && data.city.lng) {
+    // Center map on city if available
+    if (data.city && data.city.lat && data.city.lng) {
       map.setView([data.city.lat, data.city.lng], 12);
     }
-    else {
-      map.setView([26.9124, 75.7873], 12);
-    }
 
-    // map.setView([26.9124, 75.7873], 12);
     renderRoutes(data.days);
     renderItinerary(data.days);
 
     console.log("DB days:", data.days);
   } catch (err) {
     console.error("Routing error:", err);
-    console.warn("Continuing with available itinerary data");
   } finally {
     hideLoader();
   }
@@ -129,10 +120,9 @@ async function fetchDBRoute(city, days) {
   setTimeout(() => {
     map.invalidateSize(true);
   }, 800);
-
 }
 
-/* ---------------- ROUTE DRAWING ---------------- */
+/* ---------------- ROUTE DRAWING (FIXED) ---------------- */
 
 const routeColors = ["#1E90FF", "#32CD32", "#FF8C00", "#8A2BE2"];
 
@@ -141,51 +131,49 @@ function renderRoutes(days) {
   let anyRouteDrawn = false;
 
   days.forEach((day, idx) => {
-    if (!Array.isArray(day.route) || day.route.length < 2) {
+    if (!Array.isArray(day.route) || day.route.length === 0) {
       console.warn(`Skipping route for ${day.day}`);
       return;
     }
 
-    const latLngs = day.route
-      .map(p => {
-        // backend sends [lat, lng]
-        if (Array.isArray(p) && p.length === 2) {
-          return [p[0], p[1]];
-        }
-        return null;
-      })
-      .filter(Boolean);
+    day.route.forEach((segment, segIdx) => {
+      if (!Array.isArray(segment) || segment.length < 2) return;
 
-    if (latLngs.length < 2) return;
+      const animatedRoute = animatePolyline(segment, {
+        color: routeColors[idx % routeColors.length],
+        weight: 5,
+        delay: 18
+      });
 
-    anyRouteDrawn = true;
+      routeLayers.push(animatedRoute);
+      anyRouteDrawn = true;
 
-    const animatedRoute = animatePolyline(latLngs, {
-      color: routeColors[idx % routeColors.length],
-      weight: 5,
-      delay: 18   // smoother animation
+      segment.forEach(p => allLatLngs.push(p));
+
+      // Start marker (once per day)
+      if (segIdx === 0) {
+        markers.push(
+          L.marker(segment[0])
+            .addTo(map)
+            .bindPopup(`${day.day} – Start`)
+        );
+      }
+
+      // End marker (last segment only)
+      if (segIdx === day.route.length - 1) {
+        markers.push(
+          L.marker(segment[segment.length - 1])
+            .addTo(map)
+            .bindPopup(`${day.day} – End`)
+        );
+      }
     });
-
-    routeLayers.push(animatedRoute);
-    allLatLngs.push(...latLngs);
-
-    // Start marker
-    markers.push(
-      L.marker(latLngs[0]).addTo(map).bindPopup(`${day.day} – Start`)
-    );
-
-    // End marker
-    markers.push(
-      L.marker(latLngs[latLngs.length - 1])
-        .addTo(map)
-        .bindPopup(`${day.day} – End`)
-    );
   });
 
   if (anyRouteDrawn && allLatLngs.length > 0) {
     map.fitBounds(allLatLngs, { padding: [40, 40] });
   } else {
-    console.warn("No valid routes drawn, showing city only");
+    console.warn("No valid routes drawn");
   }
 }
 

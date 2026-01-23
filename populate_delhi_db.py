@@ -20,10 +20,8 @@ def populate_delhi_data():
         else:
             city = City(
                 name="Delhi",
-                state="Delhi",
-                region="North India",
-                latitude=28.6139,
-                longitude=77.2090
+                lat=28.6139,
+                lng=77.2090
             )
             db.session.add(city)
             db.session.commit()
@@ -95,12 +93,10 @@ def populate_delhi_data():
                 continue
 
             site = Site(
+                city_id=city.id,
                 name=site_data["name"],
                 latitude=site_data["latitude"],
-                longitude=site_data["longitude"],
-                category=site_data["category"],
-                description=site_data["description"],
-                city_id=city.id
+                longitude=site_data["longitude"]
             )
 
             db.session.add(site)
