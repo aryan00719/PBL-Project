@@ -1,6 +1,5 @@
 # Editor & OS
 .vscode/
-.DS_Store
 
 # Python
 venv/
@@ -17,4 +16,4 @@ instance/
 *.db
 
 # Archived / old work
-archive/
+archive/.DS_Store
