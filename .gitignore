@@ -16,4 +16,5 @@ instance/
 *.db
 
 # Archived / old work
+archive/.DS_Store
 archive/
