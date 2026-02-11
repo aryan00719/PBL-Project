@@ -328,6 +328,7 @@ input:focus {
   margin-bottom: 16px;
   box-shadow: var(--shadow-sm);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
 }
 
 .trip-card:hover {
@@ -342,9 +343,14 @@ input:focus {
 }
 
 .trip-city {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: var(--primary);
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 2px;
 }
 
 .trip-prompt {
@@ -362,6 +368,7 @@ input:focus {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px dashed var(--border);
+  padding-bottom: 4px;
 }
 
 .trip-itinerary ul {
@@ -380,4 +387,127 @@ input:focus {
 .history-footer {
   margin-top: 24px;
   text-align: center;
+}
+
+/* ===== Enhanced History Layout ===== */
+
+.trip-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.trip-actions {
+  margin-top: 10px;
+}
+
+.trip-actions button {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: #f9fafb;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.trip-actions button:hover {
+  background: #e5e7eb;
+  transform: translateY(-1px);
+}
+
+.trip-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.3s ease;
+  opacity: 0;
+}
+
+.trip-details.active {
+  max-height: 800px;
+  opacity: 1;
+}
+
+.trip-details ul {
+  padding-left: 18px;
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.trip-details li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.trip-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 0;
+  opacity: 0.6;
+}
+
+/* Responsive polish */
+@media (max-width: 600px) {
+  .trip-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .trip-actions {
+    width: 100%;
+  }
+
+  .trip-actions button {
+    width: 100%;
+  }
+}
+
+/* Smooth appearance */
+.trip-card {
+  animation: fadeInCard 0.35s ease forwards;
+}
+
+@keyframes fadeInCard {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Subtle empty state styling */
+.no-trips {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* ===============================
+   FORCE HISTORY PAGE LAYOUT FIX
+   =============================== */
+
+body.history-body {
+  overflow: auto;
+  background: var(--bg-app);
+  font-family: 'Inter', sans-serif;
+}
+
+.history-page h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.history-page {
+  padding-top: 20px;
 }

@@ -2,6 +2,8 @@ let map;
 let routeLayers = [];
 let markers = [];
 
+let placeMarkerMap = {};
+
 /* ---------------- MAP INIT ---------------- */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -23,6 +25,7 @@ function clearMap() {
   markers.forEach(m => map.removeLayer(m));
   routeLayers = [];
   markers = [];
+  placeMarkerMap = {};
 }
 
 function showLoader() {
@@ -38,14 +41,26 @@ function hideLoader() {
 /* ---------------- MAIN ROUTE HANDLER ---------------- */
 
 async function handleRoute() {
-  const input = document.getElementById("priority-input");
-  if (!input || !input.value.trim()) {
-    alert("Enter a city name");
+  const cityInput = document.getElementById("priority-input");
+  const daysInput = document.getElementById("days-input");
+
+  if (!cityInput || !cityInput.value.trim()) {
+    alert("Please enter a city name.");
     return;
   }
 
-  const city = input.value.trim();
-  const days = 3;
+  if (!daysInput || !daysInput.value) {
+    alert("Please enter number of days.");
+    return;
+  }
+
+  const city = cityInput.value.trim();
+  const days = parseInt(daysInput.value);
+
+  if (isNaN(days) || days < 1 || days > 14) {
+    alert("Days must be between 1 and 14.");
+    return;
+  }
 
   fetchDBRoute(city, days);
 }
@@ -103,8 +118,10 @@ async function fetchDBRoute(city, days) {
     }
 
     // Center map on city if available
-    if (data.city && data.city.lat && data.city.lng) {
-      map.setView([data.city.lat, data.city.lng], 12);
+    if (data.city && (data.city.lat || data.city.latitude) && (data.city.lng || data.city.longitude)) {
+      const lat = data.city.lat || data.city.latitude;
+      const lng = data.city.lng || data.city.longitude;
+      map.setView([lat, lng], 12);
     }
 
     renderRoutes(data.days);
@@ -131,43 +148,86 @@ function renderRoutes(days) {
   let anyRouteDrawn = false;
 
   days.forEach((day, idx) => {
-    if (!Array.isArray(day.route) || day.route.length === 0) {
-      console.warn(`Skipping route for ${day.day}`);
-      return;
+
+    /* ---- DRAW ROUTES ---- */
+    if (Array.isArray(day.route) && day.route.length > 0) {
+
+      // CASE 1: Flat route array [[lat,lng], [lat,lng], ...]
+      if (Array.isArray(day.route[0]) && typeof day.route[0][0] === "number") {
+
+        if (day.route.length >= 2) {
+          const animatedRoute = animatePolyline(day.route, {
+            color: routeColors[idx % routeColors.length],
+            weight: 5,
+            delay: 18
+          });
+
+          routeLayers.push(animatedRoute);
+          anyRouteDrawn = true;
+
+          day.route.forEach(p => {
+            if (Array.isArray(p) && p.length === 2) {
+              allLatLngs.push([p[0], p[1]]);
+            }
+          });
+        }
+
+      } else {
+
+        // CASE 2: Nested segments [[[lat,lng]...], [[lat,lng]...]]
+        day.route.forEach((segment) => {
+          if (!Array.isArray(segment) || segment.length < 2) return;
+
+          const animatedRoute = animatePolyline(segment, {
+            color: routeColors[idx % routeColors.length],
+            weight: 5,
+            delay: 18
+          });
+
+          routeLayers.push(animatedRoute);
+          anyRouteDrawn = true;
+
+          segment.forEach(p => {
+            if (Array.isArray(p) && p.length === 2) {
+              allLatLngs.push([p[0], p[1]]);
+            }
+          });
+        });
+
+      }
     }
 
-    day.route.forEach((segment, segIdx) => {
-      if (!Array.isArray(segment) || segment.length < 2) return;
+    /* ---- CREATE PLACE MARKERS ---- */
+    if (Array.isArray(day.places)) {
+      day.places.forEach(place => {
 
-      const animatedRoute = animatePolyline(segment, {
-        color: routeColors[idx % routeColors.length],
-        weight: 5,
-        delay: 18
+        const lat = place.lat || place.latitude;
+        const lng = place.lng || place.longitude;
+
+        if (!lat || !lng) return;
+
+        const popupHTML = `
+          <div class="popup-card">
+            <h4>${place.name}</h4>
+            <p><strong>Category:</strong> ${place.category || "Tourist Place"}</p>
+            <p><strong>Best Time:</strong> ${place.best_time_to_visit || "Morning"}</p>
+            <p><strong>Opening:</strong> ${place.opening_time || "Not Available"}</p>
+            <p><strong>Closing:</strong> ${place.closing_time || "Not Available"}</p>
+            <p><strong>Ticket Price:</strong> ${place.ticket_price || "Free"}</p>
+          </div>
+        `;
+
+        const marker = L.marker([lat, lng])
+          .addTo(map)
+          .bindPopup(popupHTML);
+
+        markers.push(marker);
+
+        if (place.name) {
+          placeMarkerMap[place.name] = marker;
+        }
       });
-
-      routeLayers.push(animatedRoute);
-      anyRouteDrawn = true;
-
-      segment.forEach(p => allLatLngs.push(p));
-
-      // Start marker (once per day)
-      if (segIdx === 0) {
-        markers.push(
-          L.marker(segment[0])
-            .addTo(map)
-            .bindPopup(`${day.day} – Start`)
-        );
-      }
-
-      // End marker (last segment only)
-      if (segIdx === day.route.length - 1) {
-        markers.push(
-          L.marker(segment[segment.length - 1])
-            .addTo(map)
-            .bindPopup(`${day.day} – End`)
-        );
-      }
-    });
+    }
   });
 
   if (anyRouteDrawn && allLatLngs.length > 0) {
@@ -197,10 +257,23 @@ function renderItinerary(days) {
 
     day.places.forEach(place => {
       const li = document.createElement("li");
+      li.style.cursor = "pointer";
+
       li.innerHTML = `
-        <strong>${place}</strong><br/>
-        <span class="itinerary-note">Popular tourist spot</span>
+        <strong>${place.name}</strong><br/>
+        <span class="itinerary-note">
+          ${place.category || "Popular tourist spot"}
+        </span>
       `;
+
+      li.addEventListener("click", () => {
+        const marker = placeMarkerMap[place.name];
+        if (marker) {
+          map.setView(marker.getLatLng(), 14);
+          marker.openPopup();
+        }
+      });
+
       list.appendChild(li);
     });
 

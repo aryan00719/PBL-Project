@@ -35,6 +35,7 @@ def populate_jaipur_data():
                 "visit_duration": "2–3 hours",
                 "entry_fee": "₹100 (Indian) / ₹500 (Foreigner)",
                 "opening_hours": "8:00 AM – 5:30 PM",
+                "best_time_to_visit": "Morning",
                 "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0d/Amber_Fort_Jaipur_2016.jpg"
             },
             {
@@ -47,6 +48,7 @@ def populate_jaipur_data():
                 "visit_duration": "1 hour",
                 "entry_fee": "₹50 / ₹200",
                 "opening_hours": "9:00 AM – 4:30 PM",
+                "best_time_to_visit": "Morning",
                 "image_url": "https://upload.wikimedia.org/wikipedia/commons/d/dc/Hawa_Mahal_2011.jpg"
             },
             {
@@ -59,6 +61,7 @@ def populate_jaipur_data():
                 "visit_duration": "2 hours",
                 "entry_fee": "₹200 / ₹700",
                 "opening_hours": "9:30 AM – 5:00 PM",
+                "best_time_to_visit": "Morning",
                 "image_url": "https://upload.wikimedia.org/wikipedia/commons/1/12/City_Palace_Jaipur_2016.jpg"
             },
             {
@@ -71,6 +74,7 @@ def populate_jaipur_data():
                 "visit_duration": "1 hour",
                 "entry_fee": "₹50 / ₹200",
                 "opening_hours": "9:00 AM – 5:00 PM",
+                "best_time_to_visit": "Morning",
                 "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/35/Jantar_Mantar%2C_Jaipur.jpg"
             },
             {
@@ -83,6 +87,7 @@ def populate_jaipur_data():
                 "visit_duration": "2 hours",
                 "entry_fee": "₹50",
                 "opening_hours": "10:00 AM – 5:30 PM",
+                "best_time_to_visit": "Evening",
                 "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Nahargarh_Fort.jpg"
             },
             {
@@ -95,6 +100,7 @@ def populate_jaipur_data():
                 "visit_duration": "30 minutes",
                 "entry_fee": "Free",
                 "opening_hours": "24 hours",
+                "best_time_to_visit": "Evening",
                 "image_url": "https://upload.wikimedia.org/wikipedia/commons/f/f4/Jal_Mahal_2011.jpg"
             }
         ]
@@ -112,11 +118,26 @@ def populate_jaipur_data():
                 print(f"⚠️ Skipped: {place['name']}")
                 continue
 
+            # Split opening hours into opening_time and closing_time
+            opening_time = None
+            closing_time = None
+            if " – " in place["opening_hours"]:
+                opening_time, closing_time = place["opening_hours"].split(" – ")
+            else:
+                opening_time = place["opening_hours"]
+                closing_time = place["opening_hours"]
+
             db_place = Site(
                 city_id=city.id,
                 name=place["name"],
+                category=place["category"],
                 latitude=place["latitude"],
                 longitude=place["longitude"],
+                visit_duration=place["visit_duration"],
+                ticket_price=place["entry_fee"],
+                opening_time=opening_time,
+                closing_time=closing_time,
+                best_time_to_visit=place["best_time_to_visit"],
             )
             db.session.add(db_place)
             print(f"✅ Added: {place['name']}")

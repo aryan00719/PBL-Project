@@ -35,8 +35,15 @@
             aria-label="Destination city" />
         </div>
 
+        <label for="days-input">Number of Days</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-calendar-days input-icon"></i>
+          <input id="days-input" type="number" min="1" max="14" step="1" value="3" placeholder="e.g. 3" required
+            aria-label="Number of travel days" />
+        </div>
+
         <button type="button" class="btn-primary" onclick="handleRoute()">
-          Plan My Trip <i class="fa-solid fa-arrow-right"></i>
+          Generate Itinerary <i class="fa-solid fa-route"></i>
         </button>
 
         <a href="/history" class="btn-secondary">

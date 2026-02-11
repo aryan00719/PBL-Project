@@ -9,6 +9,10 @@ from flask_cors import CORS
 import networkx as nx
 import osmnx as ox
 
+from datetime import datetime
+import math
+from random import shuffle
+
 # --------------------------------------------------
 # App & Config
 # --------------------------------------------------
@@ -29,6 +33,8 @@ db = SQLAlchemy(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+city_graph_cache = {}
+
 # --------------------------------------------------
 # Database Models
 # --------------------------------------------------
@@ -43,18 +49,48 @@ class City(db.Model):
 
 class Site(db.Model):
     __tablename__ = "site"
+
     id = db.Column(db.Integer, primary_key=True)
-    city_id = db.Column(db.Integer, db.ForeignKey("cities.id"), nullable=False)
+
+    # Foreign Key
+    city_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cities.id"),
+        nullable=False
+    )
+
+    # Basic Info
     name = db.Column(db.String(150), nullable=False)
     latitude = db.Column(db.Float, nullable=False)
     longitude = db.Column(db.Float, nullable=False)
 
+    # Classification
+    category = db.Column(db.String(100))
+
+    # Visiting Info
+    opening_time = db.Column(db.String(50))
+    closing_time = db.Column(db.String(50))
+    visit_duration = db.Column(db.String(50))
+    best_time_to_visit = db.Column(db.String(100))
+
+    # Pricing
+    ticket_price = db.Column(db.String(50))
+
+    # Optional (Recommended for Popups)
+    description = db.Column(db.Text)
+    image_url = db.Column(db.String(255))
+
+    # Relationship
+    city = db.relationship("City", backref=db.backref("sites", lazy=True))
+
 
 class Trip(db.Model):
     __tablename__ = "trips"
+
     id = db.Column(db.Integer, primary_key=True)
     city = db.Column(db.String(100))
     days = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # --------------------------------------------------
@@ -79,12 +115,22 @@ def fallback_segment(o, d):
 
 
 def get_city_graph(city_name):
-    logger.info(f"Downloading map graph for {city_name.lower()}")
-    return ox.graph_from_place(
-        city_name,
-        network_type="drive",
-        simplify=True
-    )
+    city_key = city_name.lower()
+
+    if city_key in city_graph_cache:
+        return city_graph_cache[city_key]
+
+    logger.info(f"Downloading map graph for {city_key}")
+    G = ox.graph_from_place(city_name, network_type="drive")
+    # Ensure we use only the largest strongly connected component
+    try:
+        largest_cc = max(nx.strongly_connected_components(G), key=len)
+        G = G.subgraph(largest_cc).copy()
+    except Exception as e:
+        logger.warning(f"Could not extract largest component: {e}")
+
+    city_graph_cache[city_key] = G
+    return G
 
 
 # --------------------------------------------------
@@ -94,11 +140,11 @@ def get_city_graph(city_name):
 def calculate_route(places, city_name):
     """
     Returns:
-    - route_segments: List[List[[lat, lng]]]
+    - full_route: List[[lat, lng]]  (single continuous polyline)
     - instructions: List[str]
     """
     G = get_city_graph(city_name)
-    route_segments = []
+    full_route = []
     instructions = []
 
     for i in range(len(places) - 1):
@@ -108,28 +154,70 @@ def calculate_route(places, city_name):
         try:
             orig = ox.distance.nearest_nodes(G, o["lng"], o["lat"])
             dest = ox.distance.nearest_nodes(G, d["lng"], d["lat"])
+
+            if not nx.has_path(G, orig, dest):
+                raise Exception("No path")
+
             path = nx.shortest_path(G, orig, dest, weight="length")
 
             coords = [
                 [G.nodes[n]["y"], G.nodes[n]["x"]] for n in path
             ]
 
-            route_segments.append(coords)
+            # Merge segments into one continuous polyline
+            if not full_route:
+                full_route.extend(coords)
+            else:
+                # Avoid duplicating first node of next segment
+                full_route.extend(coords[1:])
+
             instructions.append("Go between two places")
 
         except Exception as e:
             logger.warning(
                 f"Routing fallback activated between {o['name']} and {d['name']}: {e}"
             )
-            route_segments.extend(fallback_segment(o, d))
+
+            fallback_coords = [
+                [o["lat"], o["lng"]],
+                [d["lat"], d["lng"]]
+            ]
+
+            if not full_route:
+                full_route.extend(fallback_coords)
+            else:
+                full_route.extend(fallback_coords[1:])
+
             instructions.append("Go between two places (direct)")
 
-    return route_segments, instructions
+    return full_route, instructions
 
 
 # --------------------------------------------------
 # Itinerary Generator (DB-driven)
 # --------------------------------------------------
+
+def get_time_priority():
+    hour = datetime.now().hour
+
+    if 6 <= hour < 12:
+        return "Morning"
+    elif 12 <= hour < 17:
+        return "Afternoon"
+    elif 17 <= hour < 21:
+        return "Evening"
+    else:
+        # Late night treated as evening preference
+        return "Evening"
+
+def time_score(site_time, current_time):
+    if not site_time:
+        return 2
+    if site_time.lower() == current_time.lower():
+        return 0
+    if site_time.lower() == "any":
+        return 1
+    return 2
 
 def generate_procedural_itinerary(city_name, days):
     city = City.query.filter(
@@ -143,15 +231,42 @@ def generate_procedural_itinerary(city_name, days):
     if not sites:
         return None
 
+    time_pref = get_time_priority()
+
+    # First sort by time preference score
+    sites.sort(
+        key=lambda s: time_score(s.best_time_to_visit, time_pref)
+    )
+
+    # Shuffle within equal-priority groups for dynamic variation
+    grouped = {}
+    for s in sites:
+        score = time_score(s.best_time_to_visit, time_pref)
+        grouped.setdefault(score, []).append(s)
+
+    new_sites = []
+    for score in sorted(grouped.keys()):
+        shuffle(grouped[score])
+        new_sites.extend(grouped[score])
+
+    sites = new_sites
+
     sites_data = [
         {
+            "id": s.id,
             "name": s.name,
             "lat": s.latitude,
-            "lng": s.longitude
+            "lng": s.longitude,
+            "category": s.category,
+            "opening_time": s.opening_time,
+            "closing_time": s.closing_time,
+            "ticket_price": s.ticket_price,
+            "best_time_to_visit": s.best_time_to_visit,
+            "visit_duration": s.visit_duration
         } for s in sites
     ]
 
-    per_day = max(2, len(sites_data) // days)
+    per_day = math.ceil(len(sites_data) / days)
     itinerary = []
     idx = 0
 
@@ -159,14 +274,18 @@ def generate_procedural_itinerary(city_name, days):
         day_places = sites_data[idx:idx + per_day]
         idx += per_day
 
-        if len(day_places) < 2:
+        if not day_places:
             break
 
-        route, instructions = calculate_route(day_places, city.name)
+        if len(day_places) >= 2:
+            route, instructions = calculate_route(day_places, city.name)
+        else:
+            route = []
+            instructions = []
 
         itinerary.append({
             "day": f"Day {d + 1}",
-            "places": [p["name"] for p in day_places],
+            "places": day_places,
             "route": route,
             "instructions": instructions
         })

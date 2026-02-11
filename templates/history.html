@@ -2,44 +2,90 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
     <title>Trip History</title>
-
-    <!-- Shared App Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
-<body>
+<body class="history-body">
+
     <div class="history-page">
 
-        <h1 class="history-title">Trip History</h1>
-        <p class="history-subtitle">Previously planned routes</p>
+        <div class="history-header">
+            <h1 class="history-title">🧭 Trip History</h1>
+            <p class="history-subtitle">Review your previously generated itineraries</p>
+        </div>
 
         {% for trip in trips %}
         <div class="trip-card">
-            <div class="trip-header">
-                <strong class="trip-city">{{ trip.city.upper() }}</strong>
-                <em class="trip-prompt">{{ trip.prompt }}</em>
+
+            <div class="trip-top">
+                <div class="trip-meta">
+                    <h2 class="trip-city">{{ trip.city.upper() }}</h2>
+                    <span class="trip-date">🕒 {{ trip.timestamp }}</span>
+                </div>
+                <div class="trip-actions">
+                    <span class="trip-days">📅 {{ trip.days }} Days</span>
+                    {% if trip.itinerary %}
+                    <button class="trip-toggle" onclick="
+                        const card = this.closest('.trip-card');
+                        const details = card.querySelector('.trip-details');
+                        details.classList.toggle('active');
+                        this.textContent = details.classList.contains('active') ? 'Hide Details' : 'View Details';
+                    ">
+                        View Details
+                    </button>
+                    {% endif %}
+                </div>
             </div>
 
-            <div class="trip-detail">🏛️ {{ trip.places | join(', ') }}</div>
-            <div class="trip-detail">🍽️ {{ trip.food | join(', ') }}</div>
-            <div class="trip-detail">🕒 {{ trip.timestamp }}</div>
+            <div class="trip-details">
 
-            {% if trip.itinerary %}
-            <div class="trip-itinerary">
-                <strong>📅 Itinerary</strong>
-                <ul>
-                    {% for step in trip.itinerary %}
-                    <li>{{ step }}</li>
-                    {% endfor %}
-                </ul>
+                {% if trip.prompt %}
+                <div class="trip-section">
+                    <strong>📝 Prompt</strong>
+                    <p>{{ trip.prompt }}</p>
+                </div>
+                {% endif %}
+
+                {% if trip.places %}
+                <div class="trip-section">
+                    <strong>🏛️ Places Covered</strong>
+                    <p>{{ trip.places | join(', ') }}</p>
+                </div>
+                {% endif %}
+
+                {% if trip.food %}
+                <div class="trip-section">
+                    <strong>🍽️ Food Suggestions</strong>
+                    <p>{{ trip.food | join(', ') }}</p>
+                </div>
+                {% endif %}
+
+                {% if trip.itinerary %}
+                <div class="trip-section">
+                    <strong>📍 Itinerary Details</strong>
+                    <ol class="itinerary-list">
+                        {% for step in trip.itinerary %}
+                        <li class="itinerary-step">
+                            <span class="step-number">{{ loop.index }}.</span>
+                            <span class="step-text">{{ step }}</span>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+                {% endif %}
+
             </div>
-            {% endif %}
+
+            <div class="trip-divider"></div>
+
         </div>
         {% else %}
-        <p class="no-trips">No trips saved yet.</p>
+        <div class="no-trips">
+            <h3>No trips saved yet</h3>
+            <p>Generate your first itinerary to see it here.</p>
+        </div>
         {% endfor %}
 
         <div class="history-footer">
@@ -47,6 +93,15 @@
         </div>
 
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".trip-details").forEach(section => {
+                section.style.transition = "all 0.3s ease";
+            });
+        });
+    </script>
+
 </body>
 
 </html>
