@@ -8,6 +8,14 @@ let placeMarkerMap = {};
 
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
+
+  const generateBtn = document.getElementById("generate-btn");
+  if (generateBtn) {
+    generateBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      handleRoute();
+    });
+  }
 });
 
 function initMap() {
@@ -62,7 +70,7 @@ async function handleRoute() {
     return;
   }
 
-  fetchDBRoute(city, days);
+  await fetchDBRoute(city, days);
 }
 
 /* ---------------- ANIMATED POLYLINE ---------------- */
@@ -104,8 +112,13 @@ async function fetchDBRoute(city, days) {
   try {
     const res = await fetch("/api/db-route", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ city, days })
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        city: city,
+        days: days
+      })
     });
 
     if (!res.ok) throw new Error("Backend error");

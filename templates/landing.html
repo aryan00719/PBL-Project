@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>TravelAI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Main Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+
+    <nav class="top-navbar">
+        <div class="logo">RouteWise</div>
+
+        <div class="nav-links">
+            <a href="/" class="active">Home</a>
+            <a href="/planner">Planner</a>
+            <a href="/history">History</a>
+        </div>
+    </nav>
+
+    <section class="page-section">
+        <div>
+            <h1 class="page-title">Plan Smarter. Travel Better.</h1>
+
+            <p class="page-subtitle">
+                Procedural itinerary generation powered by real road networks,
+                intelligent routing, and time-aware location optimization.
+            </p>
+
+            <div class="hero-buttons">
+                <a href="/planner" class="btn-primary">Create Itinerary</a>
+                <a href="/home" class="btn-outline">Dashboard</a>
+            </div>
+        </div>
+    </section>
+
+</body>
+
+</html>

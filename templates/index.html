@@ -2,95 +2,111 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
   <title>Procedural Travel Itinerary & Routing System</title>
-  <meta name="description" content="A city-based travel itinerary planner with optimized routing and interactive maps.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Fonts & Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <!-- App CSS -->
+  <!-- Main Styles -->
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
-  <div class="app-layout">
+  <!-- TOP NAVBAR -->
+  <nav class="top-navbar">
+    <div class="nav-left">
+      <span class="logo">RouteWise</span>
+    </div>
+    <div class="nav-right">
+      <a href="/" class="active">Planner</a>
+      <a href="/history">History</a>
+      <a href="/home">Home</a>
+      <a href="/logout" class="logout-link">Logout</a>
+    </div>
+  </nav>
+  <div class="page-content">
+    <div class="app-container">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <div class="sidebar-card">
-        <h3><i class="fa-solid fa-compass"></i> Where to next?</h3>
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-card">
+          <h3><i class="fa-solid fa-compass"></i> Where to next?</h3>
 
-        <label for="priority-input">City or Destination</label>
-        <div class="input-wrapper">
-          <i class="fa-solid fa-magnifying-glass input-icon"></i>
-          <input id="priority-input" type="text" placeholder="e.g. Jaipur" autocomplete="off"
-            aria-label="Destination city" />
+          <label for="priority-input">City or Destination</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-magnifying-glass input-icon"></i>
+            <input id="priority-input" type="text" placeholder="e.g. Jaipur" autocomplete="off"
+              aria-label="Destination city" />
+          </div>
+
+          <label for="days-input">Number of Days</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-calendar-days input-icon"></i>
+            <input id="days-input" type="number" min="1" max="14" step="1" value="3"
+              aria-label="Number of travel days" />
+          </div>
+
+          <button type="button" class="btn-primary" onclick="handleRoute()">
+            Generate Itinerary <i class="fa-solid fa-route"></i>
+          </button>
+
+          <a href="/history" class="btn-secondary">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            View History
+          </a>
         </div>
 
-        <label for="days-input">Number of Days</label>
-        <div class="input-wrapper">
-          <i class="fa-solid fa-calendar-days input-icon"></i>
-          <input id="days-input" type="number" min="1" max="14" step="1" value="3" placeholder="e.g. 3" required
-            aria-label="Number of travel days" />
-        </div>
+        <!-- ITINERARY -->
+        <div class="itinerary-container">
+          <div class="section-header">
+            <h3>Your Itinerary</h3>
+            <span class="badge">Draft</span>
+          </div>
 
-        <button type="button" class="btn-primary" onclick="handleRoute()">
-          Generate Itinerary <i class="fa-solid fa-route"></i>
-        </button>
-
-        <a href="/history" class="btn-secondary">
-          <i class="fa-solid fa-clock-rotate-left"></i>
-          View History
-        </a>
-      </div>
-
-      <!-- ITINERARY -->
-      <div class="itinerary-container">
-        <div class="section-header">
-          <h3>Your Itinerary</h3>
-          <span class="badge">Draft</span>
-        </div>
-
-        <div id="itinerary" class="itinerary-list" aria-live="polite">
-          <div class="empty-state">
-            <p>Enter a city to generate your itinerary.</p>
+          <div id="itinerary" class="itinerary-list" aria-live="polite">
+            <div class="empty-state">
+              <h4>🚀 Plan Your Next Adventure</h4>
+              <p>
+                Choose a city and number of days to generate a smart,
+                time-aware itinerary with optimized routes.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
 
-    <!-- MAP -->
-    <main class="map-container" role="main">
-      <div id="map"></div>
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
 
-      <div id="route-instructions" class="hidden">
-        <h3><i class="fa-solid fa-diamond-turn-right"></i> Navigation</h3>
-        <div id="instruction-list"></div>
-      </div>
-    </main>
+        <div class="hero-section">
+          <h1>Create Your Travel Plan</h1>
+          <p>
+            Enter city and duration to generate dynamic route-optimized itinerary.
+          </p>
+        </div>
 
-  </div>
+        <div class="map-wrapper">
+          <div id="map"></div>
 
-  <!-- LOADER -->
-  <div id="loading-overlay">
-    <div class="spinner-box">
-      <div class="spinner"></div>
-      <p>Optimizing route…</p>
+          <div id="route-instructions" class="hidden">
+            <h3><i class="fa-solid fa-diamond-turn-right"></i> Navigation</h3>
+            <div id="instruction-list"></div>
+          </div>
+        </div>
+
+      </main>
+
     </div>
   </div>
-
-  <!-- Scripts -->
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Main Script -->
   <script src="{{ url_for('static', filename='script.js') }}"></script>
-
 </body>
 
 </html>

@@ -9,7 +9,18 @@
 
 <body class="history-body">
 
-    <div class="history-page">
+    <nav class="top-navbar">
+        <div class="nav-left">
+            <a href="/" class="logo">RouteWise</a>
+        </div>
+        <div class="nav-right">
+            <a href="/home">Home</a>
+            <a href="/planner">Planner</a>
+            <!-- <a href="/dashboard">Dashboard</a> -->
+        </div>
+    </nav>
+
+    <div class="history-page container">
 
         <div class="history-header">
             <h1 class="history-title">🧭 Trip History</h1>
@@ -21,20 +32,13 @@
 
             <div class="trip-top">
                 <div class="trip-meta">
-                    <h2 class="trip-city">{{ trip.city.upper() }}</h2>
-                    <span class="trip-date">🕒 {{ trip.timestamp }}</span>
+                    <h2 class="trip-city">{{ trip.city.title() }}</h2>
+                    <span class="trip-date">{{ trip.timestamp }}</span>
                 </div>
                 <div class="trip-actions">
-                    <span class="trip-days">📅 {{ trip.days }} Days</span>
+                    <span class="trip-days">{{ trip.days }} Days</span>
                     {% if trip.itinerary %}
-                    <button class="trip-toggle" onclick="
-                        const card = this.closest('.trip-card');
-                        const details = card.querySelector('.trip-details');
-                        details.classList.toggle('active');
-                        this.textContent = details.classList.contains('active') ? 'Hide Details' : 'View Details';
-                    ">
-                        View Details
-                    </button>
+                    <button class="trip-toggle">View Details</button>
                     {% endif %}
                 </div>
             </div>
@@ -78,8 +82,6 @@
 
             </div>
 
-            <div class="trip-divider"></div>
-
         </div>
         {% else %}
         <div class="no-trips">
@@ -96,8 +98,15 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll(".trip-details").forEach(section => {
-                section.style.transition = "all 0.3s ease";
+            document.querySelectorAll(".trip-toggle").forEach(button => {
+                button.addEventListener("click", () => {
+                    const card = button.closest(".trip-card");
+                    const details = card.querySelector(".trip-details");
+                    details.classList.toggle("active");
+                    button.textContent = details.classList.contains("active")
+                        ? "Hide Details"
+                        : "View Details";
+                });
             });
         });
     </script>

@@ -2,7 +2,7 @@ import os
 import logging
 from math import radians, cos, sin, asin, sqrt
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
@@ -12,6 +12,9 @@ import osmnx as ox
 from datetime import datetime
 import math
 from random import shuffle
+
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 
 # --------------------------------------------------
 # App & Config
@@ -27,6 +30,7 @@ os.makedirs(INSTANCE_DIR, exist_ok=True)
 DB_PATH = os.path.join(INSTANCE_DIR, "travel.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = "your-secret-key"
 
 db = SQLAlchemy(app)
 
@@ -92,10 +96,28 @@ class Trip(db.Model):
     days = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    user = db.relationship("User", backref=db.backref("trips", lazy=True))
+
+
+class User(db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
 
 # --------------------------------------------------
 # Utilities
 # --------------------------------------------------
+
+def login_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            return redirect(url_for("login"))
+        return func(*args, **kwargs)
+    return wrapper
 
 def haversine(lat1, lon1, lat2, lon2):
     lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
@@ -121,17 +143,27 @@ def get_city_graph(city_name):
         return city_graph_cache[city_key]
 
     logger.info(f"Downloading map graph for {city_key}")
-    G = ox.graph_from_place(city_name, network_type="drive")
-    # Ensure we use only the largest strongly connected component
-    try:
-        largest_cc = max(nx.strongly_connected_components(G), key=len)
-        G = G.subgraph(largest_cc).copy()
-    except Exception as e:
-        logger.warning(f"Could not extract largest component: {e}")
+
+    # Get city center from DB
+    city = City.query.filter(
+        db.func.lower(City.name) == city_key
+    ).first()
+
+    if not city:
+        raise Exception("City not found in DB")
+
+    # 20km radius buffer (adjust if needed)
+    G = ox.graph_from_point(
+        (city.lat, city.lng),
+        dist=20000,
+        network_type="drive"
+    )
+
+    # Keep largest strongly connected component
+    G = ox.truncate.largest_component(G, strongly=True)
 
     city_graph_cache[city_key] = G
     return G
-
 
 # --------------------------------------------------
 # Routing Engine
@@ -220,11 +252,20 @@ def time_score(site_time, current_time):
     return 2
 
 def generate_procedural_itinerary(city_name, days):
+    # Normalize input
+    if not city_name:
+        return None
+
+    city_name = city_name.strip().lower()
+
     city = City.query.filter(
-        db.func.lower(City.name) == city_name.lower()
+        db.func.lower(City.name) == city_name
     ).first()
 
     if not city:
+        logger.warning(f"City not found in DB: {city_name}")
+        available = [c.name for c in City.query.all()]
+        logger.warning(f"Available cities: {available}")
         return None
 
     sites = Site.query.filter_by(city_id=city.id).all()
@@ -305,15 +346,24 @@ def generate_procedural_itinerary(city_name, days):
 # --------------------------------------------------
 
 @app.route("/")
-def index():
+def landing():
+    return render_template("landing.html")
+
+@app.route("/home")
+@login_required
+def home():
+    return render_template("home.html")
+
+@app.route("/planner")
+@login_required
+def planner():
     return render_template("index.html")
 
-
 @app.route("/history")
+@login_required
 def history():
     trips = Trip.query.order_by(Trip.id.desc()).limit(10).all()
     return render_template("history.html", trips=trips)
-
 
 @app.route("/api/db-route", methods=["POST"])
 def db_route():
@@ -328,7 +378,8 @@ def db_route():
     if not itinerary:
         return jsonify({"status": "error", "message": "No data found"}), 404
 
-    trip = Trip(city=city, days=days)
+    user_id = session.get("user_id")
+    trip = Trip(city=city, days=days, user_id=user_id)
     db.session.add(trip)
     db.session.commit()
 
@@ -338,6 +389,47 @@ def db_route():
         "days": itinerary["days"]
     })
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        user = User.query.filter_by(email=email).first()
+
+        if user and check_password_hash(user.password, password):
+            session["user_id"] = user.id
+            return redirect(url_for("home"))
+
+        return "Invalid credentials"
+
+    return render_template("login.html")
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        existing = User.query.filter_by(email=email).first()
+        if existing:
+            return "User already exists"
+
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        new_user = User(email=email, password=hashed_password)
+        db.session.add(new_user)
+        db.session.commit()
+
+        return redirect(url_for("login"))
+
+    return render_template("register.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("landing"))
 
 # --------------------------------------------------
 # Bootstrap
