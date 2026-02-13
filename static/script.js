@@ -115,6 +115,7 @@ async function fetchDBRoute(city, days) {
       headers: {
         "Content-Type": "application/json"
       },
+      credentials: "same-origin",
       body: JSON.stringify({
         city: city,
         days: days
