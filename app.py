@@ -30,11 +30,11 @@ os.makedirs(INSTANCE_DIR, exist_ok=True)
 DB_PATH = os.path.join(INSTANCE_DIR, "travel.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SECRET_KEY"] = "your-secret-key"
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
 
 db = SQLAlchemy(app)
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 city_graph_cache = {}
@@ -154,7 +154,7 @@ def get_city_graph(city_name):
         G = ox.load_graphml(graph_path)
     else:
         G = ox.graph_from_place(city_name, network_type="drive")
-        G = ox.utils_graph.get_largest_component(G, strongly=True)
+        G = ox.utils_graph.get_largest_component(G, strongly=False)
         ox.save_graphml(G, graph_path)
 
     GRAPH_CACHE[city_key] = G
@@ -302,6 +302,9 @@ def generate_procedural_itinerary(city_name, days):
         } for s in sites
     ]
 
+    if days <= 0:
+        days = 1
+
     per_day = math.ceil(len(sites_data) / days)
     itinerary = []
     idx = 0
@@ -361,6 +364,7 @@ def history():
     return render_template("history.html", trips=trips)
 
 @app.route("/api/db-route", methods=["POST"])
+@login_required
 def db_route():
     data = request.get_json()
     city = data.get("city")
@@ -426,18 +430,5 @@ def logout():
     session.clear()
     return redirect(url_for("landing"))
 
-# --------------------------------------------------
-# Bootstrap
-# --------------------------------------------------
-
 if __name__ == "__main__":
-    with app.app_context():
-        print("Preloading city graphs...")
-        for city in City.query.all():
-            try:
-                get_city_graph(city.name)
-                print(f"Cached graph for {city.name}")
-            except Exception as e:
-                print(f"Graph preload failed for {city.name}: {e}")
-
     app.run(host="0.0.0.0", port=5050, debug=False)

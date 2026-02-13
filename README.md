@@ -9,6 +9,8 @@ on an interactive map.
 Unlike AI-generated systems, this application follows a **procedural,
 deterministic approach**, ensuring reproducible and explainable outputs.
 
+This version (v2.0) additionally includes user authentication, session-based access control, dynamic time-based location ordering, and improved route visualization with merged polylines for smoother navigation rendering.
+
 ---
 
 ## System Architecture
@@ -19,6 +21,7 @@ deterministic approach**, ensuring reproducible and explainable outputs.
 - SQLite database for persistent city and site data
 - Procedural itinerary generation logic
 - Graph-based route computation using OpenStreetMap data
+- Session-based authentication and user-linked trip history
 
 ### Frontend
 
@@ -48,6 +51,11 @@ deterministic approach**, ensuring reproducible and explainable outputs.
    - Map markers and bounds adjustment
    - Clean, modern UI for itinerary presentation
 
+5. **User Authentication & Trip History**
+   - Secure password hashing using PBKDF2
+   - Session-based login protection
+   - User-specific trip storage and retrieval
+
 ---
 
 ## Why This Is Not an AI-Based System
@@ -63,7 +71,7 @@ This project intentionally avoids AI-generated content to:
 
 ## Technologies Used
 
-- Python (Flask, SQLAlchemy)
+- Python (Flask, SQLAlchemy, Werkzeug Security)
 - SQLite
 - OpenStreetMap / OSMnx
 - NetworkX
@@ -100,7 +108,16 @@ The following components are intended for copyright and/or patent protection:
 
 ## Note
 
-Graph cache files are generated locally and are not part of the core source code.s
+Graph cache files are generated locally and are not part of the core source code.
+
+---
+
+## Deployment Notes
+
+- Designed for deployment using Gunicorn in production environments
+- Graph caching implemented to reduce repeated OpenStreetMap downloads
+- Debug mode disabled for production builds
+- Suitable for hosting on platforms such as Render or similar cloud services
 
 ---
 
