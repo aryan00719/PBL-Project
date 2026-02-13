@@ -112,13 +112,41 @@ class Trip(db.Model):
     user = db.relationship("User", backref=db.backref("trips", lazy=True))
 
 
-# --------------------------------------------------
-# Ensure tables are created after all models are defined
+def seed_data():
+    if City.query.first():
+        return  # already seeded
+
+    jaipur = City(name="Jaipur", lat=26.9124, lng=75.7873)
+    delhi = City(name="Delhi", lat=28.6139, lng=77.2090)
+
+    db.session.add_all([jaipur, delhi])
+    db.session.commit()
+
+    # Add 2–3 demo sites
+    site1 = Site(
+        city_id=jaipur.id,
+        name="Hawa Mahal",
+        latitude=26.9239,
+        longitude=75.8267,
+        category="Monument",
+        best_time_to_visit="Morning"
+    )
+
+    site2 = Site(
+        city_id=delhi.id,
+        name="India Gate",
+        latitude=28.6129,
+        longitude=77.2295,
+        category="Monument",
+        best_time_to_visit="Evening"
+    )
+
+    db.session.add_all([site1, site2])
+    db.session.commit()
+
 with app.app_context():
     db.create_all()
-
-# --------------------------------------------------
-# Utilities
+    seed_data()
 
 # --------------------------------------------------
 # Utilities
