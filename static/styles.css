@@ -535,64 +535,6 @@ input:focus {
   opacity: 0.8;
 }
 
-/* ===============================
-   FORCE HISTORY PAGE LAYOUT FIX
-   =============================== */
-
-/* Landing Page */
-
-.landing-body {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  color: white;
-  text-align: center;
-}
-
-.landing-container h1 {
-  font-size: 2.5rem;
-  margin-bottom: 20px;
-}
-
-.landing-primary-btn {
-  display: inline-block;
-  padding: 14px 30px;
-  background: white;
-  color: #1e3c72;
-  text-decoration: none;
-  border-radius: 10px;
-  font-weight: 600;
-  transition: all 0.25s ease;
-}
-
-.landing-primary-btn:hover {
-  background: #f3f4f6;
-  transform: translateY(-2px);
-}
-
-.landing-buttons {
-  margin-top: 25px;
-}
-
-.landing-secondary-btn {
-  display: inline-block;
-  padding: 14px 30px;
-  background: transparent;
-  border: 2px solid white;
-  color: white;
-  text-decoration: none;
-  border-radius: 10px;
-  margin-left: 15px;
-  transition: all 0.25s ease;
-}
-
-.landing-secondary-btn:hover {
-  background: white;
-  color: #1e3c72;
-  transform: translateY(-2px);
-}
 
 /* Dashboard */
 
@@ -874,5 +816,138 @@ input:focus {
   .top-navbar a {
     font-size: 0.85rem;
     padding: 6px 10px;
+  }
+}
+
+/* ===============================
+   HERO BUTTON GROUP (HOME PAGE)
+   =============================== */
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.hero-actions a {
+  min-width: 170px;
+  text-align: center;
+}
+
+.hero-actions .btn-primary {
+  width: auto;
+  padding: 12px 26px;
+  font-size: 0.95rem;
+}
+
+.hero-actions .btn-secondary {
+  width: auto;
+  padding: 12px 26px;
+  font-size: 0.95rem;
+  background: transparent;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+}
+
+.hero-actions .btn-secondary:hover {
+  background: var(--primary);
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .hero-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-actions a {
+    width: 100%;
+  }
+}
+
+/* ===============================
+   LANDING PAGE (CONSISTENT STYLE)
+   =============================== */
+
+.landing-body {
+  background: var(--bg-app);
+  padding-top: 72px;
+  /* match navbar spacing */
+}
+
+.landing-container {
+  max-width: 900px;
+  margin: 140px auto 0;
+  padding: 0 20px;
+  text-align: center;
+}
+
+.landing-container h1 {
+  font-size: 2.4rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.landing-container p {
+  font-size: 1rem;
+  color: var(--text-muted);
+  max-width: 700px;
+  margin: 0 auto 30px;
+}
+
+.landing-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 36px;
+  margin-top: 36px;
+}
+
+.landing-buttons a {
+  text-align: center;
+}
+
+.landing-buttons .landing-primary-btn {
+  padding: 14px 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: all 0.25s ease;
+  min-width: 210px;
+}
+
+.landing-buttons .landing-primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.landing-buttons .landing-secondary-btn {
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: all 0.25s ease;
+  min-width: 160px;
+}
+
+.landing-buttons .landing-secondary-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .landing-buttons {
+    flex-direction: column;
+  }
+
+  .landing-buttons a {
+    width: 100%;
   }
 }
