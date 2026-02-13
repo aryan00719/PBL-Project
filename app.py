@@ -34,6 +34,9 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
 
 db = SQLAlchemy(app)
 
+with app.app_context():
+    db.create_all()
+
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
