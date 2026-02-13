@@ -136,33 +136,28 @@ def fallback_segment(o, d):
     ]]
 
 
+GRAPH_CACHE = {}
+
 def get_city_graph(city_name):
     city_key = city_name.lower()
 
-    if city_key in city_graph_cache:
-        return city_graph_cache[city_key]
+    # 1. In-memory cache (fastest)
+    if city_key in GRAPH_CACHE:
+        return GRAPH_CACHE[city_key]
 
-    logger.info(f"Downloading map graph for {city_key}")
+    # 2. File cache
+    cache_dir = "graph_cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    graph_path = os.path.join(cache_dir, f"{city_key}.graphml")
 
-    # Get city center from DB
-    city = City.query.filter(
-        db.func.lower(City.name) == city_key
-    ).first()
+    if os.path.exists(graph_path):
+        G = ox.load_graphml(graph_path)
+    else:
+        G = ox.graph_from_place(city_name, network_type="drive")
+        G = ox.utils_graph.get_largest_component(G, strongly=True)
+        ox.save_graphml(G, graph_path)
 
-    if not city:
-        raise Exception("City not found in DB")
-
-    # 20km radius buffer (adjust if needed)
-    G = ox.graph_from_point(
-        (city.lat, city.lng),
-        dist=20000,
-        network_type="drive"
-    )
-
-    # Keep largest strongly connected component
-    G = ox.truncate.largest_component(G, strongly=True)
-
-    city_graph_cache[city_key] = G
+    GRAPH_CACHE[city_key] = G
     return G
 
 # --------------------------------------------------
@@ -437,7 +432,12 @@ def logout():
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()
+        print("Preloading city graphs...")
+        for city in City.query.all():
+            try:
+                get_city_graph(city.name)
+                print(f"Cached graph for {city.name}")
+            except Exception as e:
+                print(f"Graph preload failed for {city.name}: {e}")
 
-    logger.info("Server running at http://localhost:5050")
     app.run(host="0.0.0.0", port=5050, debug=False)
