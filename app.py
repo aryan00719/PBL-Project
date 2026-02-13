@@ -427,7 +427,14 @@ def db_route():
         return jsonify({"status": "error", "message": "No data found"}), 404
 
     user_id = session.get("user_id")
-    trip = Trip(city=city, days=days, user_id=user_id)
+
+    # Ensure user exists in DB (important after DB migrations)
+    user = User.query.get(user_id) if user_id else None
+    if not user:
+        session.clear()
+        return jsonify({"status": "error", "message": "User session invalid. Please login again."}), 401
+
+    trip = Trip(city=city, days=days, user_id=user.id)
     db.session.add(trip)
     db.session.commit()
 
