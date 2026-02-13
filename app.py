@@ -34,9 +34,6 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
 
 db = SQLAlchemy(app)
 
-with app.app_context():
-    db.create_all()
-
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
@@ -52,6 +49,7 @@ class City(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     lat = db.Column(db.Float, nullable=False)
     lng = db.Column(db.Float, nullable=False)
+
 
 
 class Site(db.Model):
@@ -91,6 +89,17 @@ class Site(db.Model):
     city = db.relationship("City", backref=db.backref("sites", lazy=True))
 
 
+# --------------------------------------------------
+# User Model
+# --------------------------------------------------
+class User(db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+
+
 class Trip(db.Model):
     __tablename__ = "trips"
 
@@ -103,12 +112,13 @@ class Trip(db.Model):
     user = db.relationship("User", backref=db.backref("trips", lazy=True))
 
 
-class User(db.Model):
-    __tablename__ = "users"
+# --------------------------------------------------
+# Ensure tables are created after all models are defined
+with app.app_context():
+    db.create_all()
 
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
+# --------------------------------------------------
+# Utilities
 
 # --------------------------------------------------
 # Utilities
