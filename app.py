@@ -372,7 +372,7 @@ def generate_procedural_itinerary(city_name, days):
     if days <= 0:
         days = 1
 
-    per_day = math.ceil(len(sites_data) / days)
+    per_day = max(2, math.ceil(len(sites_data) / days))
     itinerary = []
     idx = 0
 
@@ -386,8 +386,12 @@ def generate_procedural_itinerary(city_name, days):
         if len(day_places) >= 2:
             route, instructions = calculate_route(day_places, city.name)
         else:
-            route = []
-            instructions = []
+            # Force at least 2 places if possible
+            if len(sites_data) >= 2:
+                route, instructions = calculate_route(sites_data[:2], city.name)
+            else:
+                route = []
+                instructions = []
 
         itinerary.append({
             "day": f"Day {d + 1}",
