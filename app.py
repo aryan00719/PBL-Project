@@ -165,7 +165,46 @@ def seed_data():
         best_time_to_visit="Afternoon"
     )
 
-    db.session.add_all([site1, site2, site3, site4])
+    site5 = Site(
+        city_id=jaipur.id,
+        name="Jal Mahal",
+        latitude=26.9535,
+        longitude=75.8462,
+        category="Lake Palace",
+        best_time_to_visit="Evening"
+    )
+
+    site6 = Site(
+        city_id=jaipur.id,
+        name="Nahargarh Fort",
+        latitude=26.9368,
+        longitude=75.8160,
+        category="Fort",
+        best_time_to_visit="Evening"
+    )
+
+    site7 = Site(
+        city_id=jaipur.id,
+        name="Albert Hall Museum",
+        latitude=26.9124,
+        longitude=75.8196,
+        category="Museum",
+        best_time_to_visit="Afternoon"
+    )
+
+    site8 = Site(
+        city_id=jaipur.id,
+        name="Jantar Mantar",
+        latitude=26.9248,
+        longitude=75.8246,
+        category="Observatory",
+        best_time_to_visit="Morning"
+    )
+
+    db.session.add_all([
+        site1, site2, site3, site4,
+        site5, site6, site7, site8
+    ])
     db.session.commit()
 
 with app.app_context():
@@ -355,33 +394,26 @@ def generate_procedural_itinerary(city_name, days):
     # For demo: allow max 3 days
     days = min(days, 3)
 
-    # Split sites evenly
-    per_day = max(1, len(sites_data) // days)
+    # Split sites evenly using ceiling to ensure proper distribution
+    per_day = math.ceil(len(sites_data) / days)
 
     itinerary = []
-    index = 0
 
     for d in range(days):
-        day_places = sites_data[index:index+per_day]
-        index += per_day
+        start = d * per_day
+        end = start + per_day
+        day_places = sites_data[start:end]
 
         if not day_places:
             break
 
-        route = []
-        instructions = []
+        # Always attempt proper routing
+        route, instructions = calculate_route(day_places, city.name)
 
-        # 🔥 DEMO GUARANTEE: Always produce route
-        if len(day_places) >= 2:
-            route, instructions = calculate_route(day_places, city.name)
+        # If routing fails or only one place exists, create fallback polyline
+        if not route or len(route) < 2:
+            route = [[p["lat"], p["lng"]] for p in day_places]
 
-        # Fallback if routing fails
-        if not route:
-            route = []
-            for p in day_places:
-                route.append([p["lat"], p["lng"]])
-
-            # If only one place → connect to city center
             if len(route) == 1:
                 route.append([city.lat, city.lng])
 
