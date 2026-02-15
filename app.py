@@ -409,7 +409,10 @@ def planner():
 @app.route("/history")
 @login_required
 def history():
-    trips = Trip.query.order_by(Trip.id.desc()).limit(10).all()
+    trips = Trip.query.filter_by(user_id=session.get("user_id")) \
+                .order_by(Trip.id.desc()) \
+                .limit(10) \
+                .all()
     return render_template("history.html", trips=trips)
 
 @app.route("/api/db-route", methods=["POST"])
