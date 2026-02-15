@@ -149,7 +149,25 @@ def seed_data():
         best_time_to_visit="Evening"
     )
 
-    db.session.add_all([site1, site2])
+    site3 = Site(
+        city_id=jaipur.id,
+        name="Amer Fort",
+        latitude=26.9855,
+        longitude=75.8513,
+        category="Fort",
+        best_time_to_visit="Morning"
+    )
+
+    site4 = Site(
+        city_id=jaipur.id,
+        name="City Palace",
+        latitude=26.9258,
+        longitude=75.8237,
+        category="Palace",
+        best_time_to_visit="Afternoon"
+    )
+
+    db.session.add_all([site1, site2, site3, site4])
     db.session.commit()
 
 with app.app_context():
