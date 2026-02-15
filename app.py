@@ -408,7 +408,18 @@ def generate_procedural_itinerary(city_name, days):
             break
 
         # Always attempt proper routing
-        route, instructions = calculate_route(day_places, city.name)
+        # route, instructions = calculate_route(day_places, city.name)
+
+        # DEMO SAFE ROUTE (simple polyline connecting places in order)
+        route = [[p["lat"], p["lng"]] for p in day_places]
+
+        if len(route) < 2:
+            route.append([city.lat, city.lng])
+
+        instructions = [
+            f"Travel from {day_places[i]['name']} to {day_places[i+1]['name']}"
+            for i in range(len(day_places) - 1)
+        ]
 
         # If routing fails or only one place exists, create fallback polyline
         if not route or len(route) < 2:
