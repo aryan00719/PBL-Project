@@ -237,6 +237,10 @@ def calculate_route(places, city_name):
     - full_route: List[[lat, lng]]  (single continuous polyline)
     - instructions: List[str]
     """
+    # A route requires at least two points.
+    if len(places) < 2:
+        return [], []
+
     G = get_city_graph(city_name)
     full_route = []
     instructions = []
@@ -249,43 +253,44 @@ def calculate_route(places, city_name):
             orig = ox.distance.nearest_nodes(G, o["lng"], o["lat"])
             dest = ox.distance.nearest_nodes(G, d["lng"], d["lat"])
 
+            # If no path exists, raise an exception to trigger the fallback.
             if not nx.has_path(G, orig, dest):
-                raise Exception("No path")
+                raise ValueError("No path found between nodes.")
 
             path = nx.shortest_path(G, orig, dest, weight="length")
 
-            coords = [
-                [G.nodes[n]["y"], G.nodes[n]["x"]] for n in path
-            ]
+            # A path segment must have at least 2 nodes. If not, skip (e.g., same node).
+            if len(path) < 2:
+                continue
+
+            coords = [[G.nodes[n]["y"], G.nodes[n]["x"]] for n in path]
 
             # Merge segments into one continuous polyline
             if not full_route:
                 full_route.extend(coords)
             else:
-                # Avoid duplicating first node of next segment
+                # Avoid duplicating the start node of the next segment
                 full_route.extend(coords[1:])
 
-            instructions.append("Go between two places")
+            instructions.append(f"Go from {o['name']} to {d['name']}")
 
         except Exception as e:
             logger.warning(
                 f"Routing fallback activated between {o['name']} and {d['name']}: {e}"
             )
 
-            fallback_coords = [
-                [o["lat"], o["lng"]],
-                [d["lat"], d["lng"]]
-            ]
+            fallback_coords = [[o["lat"], o["lng"]], [d["lat"], d["lng"]]]
 
             if not full_route:
                 full_route.extend(fallback_coords)
             else:
+                # To stitch segments, extend with a list containing only the destination point.
+                # fallback_coords[1:] correctly results in [[d_lat, d_lng]].
                 full_route.extend(fallback_coords[1:])
 
             instructions.append("Go between two places (direct)")
 
     return full_route, instructions
-
 
 # --------------------------------------------------
 # Itinerary Generator (DB-driven)
@@ -372,26 +377,33 @@ def generate_procedural_itinerary(city_name, days):
     if days <= 0:
         days = 1
 
-    per_day = max(2, math.ceil(len(sites_data) / days))
+    num_sites = len(sites_data)
+
+    # For demo reliability, ensure we have at least 2 places per day if possible,
+    # by adjusting the number of days in the itinerary.
+    max_days_possible = num_sites // 2 if num_sites > 1 else 1
+    actual_days = min(days, max_days_possible) if max_days_possible > 0 else 1
+
+    # Distribute places as evenly as possible across the actual number of days.
+    sites_per_day = math.ceil(num_sites / actual_days) if actual_days > 0 else 0
+
     itinerary = []
     idx = 0
 
-    for d in range(days):
-        day_places = sites_data[idx:idx + per_day]
-        idx += per_day
+    for d in range(actual_days):
+        if idx >= num_sites:
+            break
+
+        day_places = sites_data[idx : idx + sites_per_day]
+        idx += sites_per_day
 
         if not day_places:
             break
 
+        # A route can only be calculated for 2 or more places.
+        route, instructions = [], []
         if len(day_places) >= 2:
             route, instructions = calculate_route(day_places, city.name)
-        else:
-            # Force at least 2 places if possible
-            if len(sites_data) >= 2:
-                route, instructions = calculate_route(sites_data[:2], city.name)
-            else:
-                route = []
-                instructions = []
 
         itinerary.append({
             "day": f"Day {d + 1}",
