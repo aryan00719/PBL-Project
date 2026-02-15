@@ -58,8 +58,6 @@ class City(db.Model):
     lat = db.Column(db.Float, nullable=False)
     lng = db.Column(db.Float, nullable=False)
 
-
-
 class Site(db.Model):
     __tablename__ = "site"
 
