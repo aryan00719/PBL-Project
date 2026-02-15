@@ -102,6 +102,32 @@ def populate_jaipur_data():
                 "opening_hours": "24 hours",
                 "best_time_to_visit": "Evening",
                 "image_url": "https://upload.wikimedia.org/wikipedia/commons/f/f4/Jal_Mahal_2011.jpg"
+            },
+            {
+                "name": "Albert Hall Museum",
+                "category": "Museum",
+                "description": "A grand Indo-Saracenic museum showcasing art and history.",
+                "latitude": 26.9124,
+                "longitude": 75.8190,
+                "rating": 4.5,
+                "visit_duration": "1–2 hours",
+                "entry_fee": "₹40 / ₹300",
+                "opening_hours": "9:00 AM – 5:00 PM",
+                "best_time_to_visit": "Afternoon",
+                "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Albert_Hall_Museum_Jaipur.jpg"
+            },
+            {
+                "name": "Birla Mandir",
+                "category": "Temple",
+                "description": "A beautiful white marble temple dedicated to Lord Vishnu.",
+                "latitude": 26.8913,
+                "longitude": 75.8150,
+                "rating": 4.6,
+                "visit_duration": "45 minutes",
+                "entry_fee": "Free",
+                "opening_hours": "8:00 AM – 12:00 PM",
+                "best_time_to_visit": "Evening",
+                "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3f/Birla_Mandir_Jaipur.jpg"
             }
         ]
 
