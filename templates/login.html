@@ -3,96 +3,73 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Login | Procedural Travel Planner</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Login - RouteWise</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-glass);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+    </style>
 </head>
 
-<body class="auth-body">
-
-    <div class="auth-container">
-
-        <div class="auth-card">
-            <h2>Welcome Back</h2>
-            <p class="auth-subtitle">
-                Access your personalized procedural travel itineraries
-            </p>
-
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <div class="flash-messages">
-                {% for category, message in messages %}
-                <div class="flash {{ category }}">
-                    {{ message }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            {% endwith %}
-
-            <form method="POST" action="{{ url_for('login') }}" class="auth-form" autocomplete="on">
-
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" required placeholder="Enter your email address"
-                        autocomplete="email">
-                </div>
-
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="password" name="password" required minlength="6"
-                            placeholder="Enter your password" autocomplete="current-password">
-                        <button type="button" class="toggle-password" onclick="togglePassword()">
-                            Show
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-extra">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="remember">
-                        Remember me
-                    </label>
-                    <a href="#" class="forgot-link">Forgot password?</a>
-                </div>
-
-                <button type="submit" class="primary-btn">
-                    Login
-                </button>
-
-            </form>
-
-            <div class="auth-footer">
-                <p>
-                    Don’t have an account?
-                    <a href="{{ url_for('register') }}">Register here</a>
-                </p>
-            </div>
-
-            <div class="auth-footer secondary">
-                <a href="{{ url_for('landing') }}">← Back to Landing</a>
-            </div>
+<body>
+    <div class="auth-card">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-primary mb-1"><i class="fa-solid fa-route"></i> RouteWise</h1>
+            <p class="text-muted text-sm">Welcome back! Please login.</p>
         </div>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="toast {{ 'success' if category == 'success' else 'error' }} mb-4"
+            style="position:static; transform:none; opacity:1;">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/login">
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="input-control" required placeholder="Enter your email">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="input-control" required placeholder="••••••••">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block mt-4">Login</button>
+        </form>
+
+        <div class="text-center mt-6 text-sm">
+            <span class="text-muted">Don't have an account?</span>
+            <a href="/register" class="font-medium">Sign up</a>
+        </div>
+        <div class="text-center mt-2">
+            <a href="/" class="text-xs text-muted">Back to Home</a>
+        </div>
     </div>
-
-    <script>
-        function togglePassword() {
-            const passwordInput = document.getElementById("password");
-            const toggleBtn = document.querySelector(".toggle-password");
-
-            if (passwordInput.type === "password") {
-                passwordInput.type = "text";
-                toggleBtn.textContent = "Hide";
-            } else {
-                passwordInput.type = "password";
-                toggleBtn.textContent = "Show";
-            }
-        }
-    </script>
-
 </body>
 
 </html>

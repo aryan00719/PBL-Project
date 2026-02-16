@@ -1,6 +1,7 @@
 import os
 import logging
 from math import radians, cos, sin, asin, sqrt
+from typing import List, Dict, Any, Tuple
 
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
@@ -12,6 +13,8 @@ import osmnx as ox
 from datetime import datetime
 import math
 from random import shuffle
+import numpy as np
+from sklearn.cluster import KMeans
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -58,6 +61,11 @@ class City(db.Model):
     lat = db.Column(db.Float, nullable=False)
     lng = db.Column(db.Float, nullable=False)
 
+    def __init__(self, name, lat, lng):
+        self.name = name
+        self.lat = lat
+        self.lng = lng
+
 class Site(db.Model):
     __tablename__ = "site"
 
@@ -94,6 +102,20 @@ class Site(db.Model):
     # Relationship
     city = db.relationship("City", backref=db.backref("sites", lazy=True))
 
+    def __init__(self, city_id, name, latitude, longitude, category=None, opening_time=None, closing_time=None, visit_duration=None, best_time_to_visit=None, ticket_price=None, description=None, image_url=None):
+        self.city_id = city_id
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+        self.category = category
+        self.opening_time = opening_time
+        self.closing_time = closing_time
+        self.visit_duration = visit_duration
+        self.best_time_to_visit = best_time_to_visit
+        self.ticket_price = ticket_price
+        self.description = description
+        self.image_url = image_url
+
 
 # --------------------------------------------------
 # User Model
@@ -104,6 +126,10 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+
+    def __init__(self, email, password):
+        self.email = email
+        self.password = password
 
 
 class Trip(db.Model):
@@ -116,6 +142,11 @@ class Trip(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     user = db.relationship("User", backref=db.backref("trips", lazy=True))
+
+    def __init__(self, city, days, user_id=None):
+        self.city = city
+        self.days = days
+        self.user_id = user_id
 
 
 def seed_data():
@@ -255,10 +286,13 @@ def get_city_graph(city_name):
     graph_path = os.path.join(cache_dir, f"{city_key}.graphml")
 
     if os.path.exists(graph_path):
+        logger.info(f"Loading graph for {city_name} from disk...")
         G = ox.load_graphml(graph_path)
     else:
+        logger.info(f"Downloading graph for {city_name}...")
         G = ox.graph_from_place(city_name, network_type="drive")
-        G = ox.utils_graph.get_largest_component(G, strongly=False)
+        # Ensure strongly connected to prevent routing errors
+        G = ox.utils_graph.get_largest_component(G, strongly=True)
         ox.save_graphml(G, graph_path)
 
     GRAPH_CACHE[city_key] = G
@@ -268,64 +302,96 @@ def get_city_graph(city_name):
 # Routing Engine
 # --------------------------------------------------
 
-def calculate_route(places, city_name):
+def calculate_route(places: List[Dict[str, Any]], city_name: str) -> Tuple[List[List[float]], List[str]]:
     """
     Returns:
     - full_route: List[[lat, lng]]  (single continuous polyline)
     - instructions: List[str]
     """
-    # A route requires at least two points.
     if len(places) < 2:
         return [], []
 
-    G = get_city_graph(city_name)
-    full_route = []
-    instructions = []
+    try:
+        G = get_city_graph(city_name)
+    except Exception as e:
+        logger.error(f"Failed to load graph: {e}")
+        return [], []
+
+    full_route: List[List[float]] = []
+    instructions: List[str] = []
 
     for i in range(len(places) - 1):
         o = places[i]
         d = places[i + 1]
 
         try:
-            orig = ox.distance.nearest_nodes(G, o["lng"], o["lat"])
-            dest = ox.distance.nearest_nodes(G, d["lng"], d["lat"])
+            orig_node = ox.distance.nearest_nodes(G, o["lng"], o["lat"])
+            dest_node = ox.distance.nearest_nodes(G, d["lng"], d["lat"])
 
-            # If no path exists, raise an exception to trigger the fallback.
-            if not nx.has_path(G, orig, dest):
-                raise ValueError("No path found between nodes.")
+            path = nx.shortest_path(G, orig_node, dest_node, weight="length")
 
-            path = nx.shortest_path(G, orig, dest, weight="length")
-
-            # A path segment must have at least 2 nodes. If not, skip (e.g., same node).
+            # Extract geometry from edges
+            segment_coords = []
+            
+            # If path is just one node (start == end), skip
             if len(path) < 2:
                 continue
 
-            coords = [[G.nodes[n]["y"], G.nodes[n]["x"]] for n in path]
+            for u, v in zip(path[:-1], path[1:]):
+                # Get edge data
+                edge_data = G.get_edge_data(u, v)
+                
+                # OSMnx graphs are MultiDiGraphs, so edge_data is a dictionary keyed by key (0, 1, etc.)
+                # applied usually 0 for the first edge
+                if edge_data:
+                    # Prefer lowest key (0) or any available
+                    data = edge_data[0]
+                    if "geometry" in data:
+                        # Extract geometry (LineString) checking for .coords or directly interacting
+                        # Shapely LineString.coords is list of (x, y) = (lng, lat)
+                        # We need [lat, lng]
+                        xs, ys = data["geometry"].xy
+                        for x, y in zip(xs, ys):
+                            segment_coords.append([y, x])
+                    else:
+                        # Fallback to straight line between nodes if no geometry
+                        # Node u
+                        segment_coords.append([G.nodes[u]["y"], G.nodes[u]["x"]])
+                        # Node v
+                        segment_coords.append([G.nodes[v]["y"], G.nodes[v]["x"]])
+            
+            # Ensure the last node coords are added if segment_coords is empty or for continuity
+            # But the loop above adds all points. We might have duplicates at seams.
+            
+            if not segment_coords:
+                 # Fallback if loop didn't run (shouldn't happen if path > 1)
+                 segment_coords = [[G.nodes[n]["y"], G.nodes[n]["x"]] for n in path]
 
-            # Merge segments into one continuous polyline
-            if not full_route:
-                full_route.extend(coords)
+            # Append to full route
+            # Avoid duplicate points at connection (end of previous == start of current)
+            if full_route and segment_coords:
+                # Calculate distance between last of full_route and first of segment
+                # If very close, skip first of segment
+                last_pt = full_route[-1]
+                first_pt = segment_coords[0]
+                if last_pt == first_pt:
+                    full_route.extend(segment_coords[1:])
+                else:
+                    full_route.extend(segment_coords)
             else:
-                # Avoid duplicating the start node of the next segment
-                full_route.extend(coords[1:])
+                full_route.extend(segment_coords)
 
-            instructions.append(f"Go from {o['name']} to {d['name']}")
+            instructions.append(f"Travel from {o['name']} to {d['name']}")
 
         except Exception as e:
-            logger.warning(
-                f"Routing fallback activated between {o['name']} and {d['name']}: {e}"
-            )
-
-            fallback_coords = [[o["lat"], o["lng"]], [d["lat"], d["lng"]]]
-
-            if not full_route:
-                full_route.extend(fallback_coords)
+            logger.error(f"Routing failed between {o['name']} and {d['name']}: {e}")
+            # Fallback: Straight line
+            fallback = [[o["lat"], o["lng"]], [d["lat"], d["lng"]]]
+            if full_route:
+                full_route.extend(fallback[1:])
             else:
-                # To stitch segments, extend with a list containing only the destination point.
-                # fallback_coords[1:] correctly results in [[d_lat, d_lng]].
-                full_route.extend(fallback_coords[1:])
-
-            instructions.append("Go between two places (direct)")
+                full_route.extend(fallback)
+            instructions.append(f"Travel to {d['name']} (Direct)")
 
     return full_route, instructions
 
@@ -373,7 +439,7 @@ def generate_procedural_itinerary(city_name, days):
     if not sites:
         return None
 
-    sites_data = [
+    sites_data: List[Dict[str, Any]] = [
         {
             "id": s.id,
             "name": s.name,
@@ -394,41 +460,84 @@ def generate_procedural_itinerary(city_name, days):
     # For demo: allow max 3 days
     days = min(days, 3)
 
-    # Split sites evenly using ceiling to ensure proper distribution
-    per_day = math.ceil(len(sites_data) / days)
+    # Clustering Logic
+    coordinates = np.array([[s["lat"], s["lng"]] for s in sites_data])
+    
+    # K-Means Clustering to group by days
+    # If sites < days, reduce days to len(sites) - handled below naturally
+    
+    num_days = min(days, len(sites_data))
+    
+    # Map cluster index to list of sites
+    day_clusters = {i: [] for i in range(num_days)}
+    
+    if num_days > 1:
+        kmeans = KMeans(n_clusters=num_days, random_state=42, n_init=10)
+        labels = kmeans.fit_predict(coordinates)
+        
+        for idx, label in enumerate(labels):
+            day_clusters[label].append(sites_data[idx])
+    else:
+        # Just one day (or one cluster)
+        day_clusters[0] = sites_data
 
+    # Generate Itinerary for each day
     itinerary = []
+    
+    # Sort clusters by something? Maybe distance from city center?
+    # For now, just iterate 0..k
+    
+    for d in range(num_days):
+        day_places_unsorted = day_clusters[d]
+        
+        if not day_places_unsorted:
+            continue
+            
+        # Optimization: Sort using Nearest Neighbor Heuristic (TSP)
+        # Start with the place closest to top-left or city center?
+        # Let's just pick the first in list as start, or the one with min latitude (most north?)
+        
+        # Sort by latitude descending (North to South) as a simple heuristic for start
+        day_places_unsorted.sort(key=lambda x: x["lat"], reverse=True)
+        
+        logger.info(f"Day {d+1} Unsorted: {[p['name'] for p in day_places_unsorted]}")
 
-    for d in range(days):
-        start = d * per_day
-        end = start + per_day
-        day_places = sites_data[start:end]
+        sorted_places = []
+        current = day_places_unsorted.pop(0) # Pick northernmost start
+        sorted_places.append(current)
+        
+        while day_places_unsorted:
+            # Find closest to current
+            curr_lat, curr_lng = current["lat"], current["lng"]
+            
+            # Simple euclidean distance func for sorting
+            def dist_sq(p):
+                return (p["lat"] - curr_lat)**2 + (p["lng"] - curr_lng)**2
+            
+            # Get closest
+            nearest = min(day_places_unsorted, key=dist_sq)
+            
+            # Move to sorted
+            sorted_places.append(nearest)
+            day_places_unsorted.remove(nearest)
+            current = nearest
+            
+        day_places = sorted_places
+        logger.info(f"Day {d+1} Sorted: {[p['name'] for p in day_places]}")
 
-        if not day_places:
-            break
+        # Route Generation
+        route = []
+        instructions = []
+        
+        try:
+             route, instructions = calculate_route(day_places, city.name)
+        except Exception as e:
+             logger.error(f"Error calculating route for day {d+1}: {e}")
 
-        # Always attempt proper routing
-        # route, instructions = calculate_route(day_places, city.name)
-
-        # DEMO SAFE ROUTE (simple polyline connecting places in order)
-        route = [[p["lat"], p["lng"]] for p in day_places]
-
-        if len(route) < 2:
-            route.append([city.lat, city.lng])
-
-        instructions = [
-            f"Travel from {day_places[i]['name']} to {day_places[i+1]['name']}"
-            for i in range(len(day_places) - 1)
-        ]
-
-        # If routing fails or only one place exists, create fallback polyline
-        if not route or len(route) < 2:
+        # Fallback if routing completely failed (e.g. graph load error)
+        if not route and len(day_places) > 1:
             route = [[p["lat"], p["lng"]] for p in day_places]
-
-            if len(route) == 1:
-                route.append([city.lat, city.lng])
-
-            instructions = ["Demo route connection"]
+            instructions = [f"Visit {p['name']}" for p in day_places]
 
         itinerary.append({
             "day": f"Day {d+1}",
@@ -436,6 +545,8 @@ def generate_procedural_itinerary(city_name, days):
             "route": route,
             "instructions": instructions
         })
+
+
 
     return {
         "city": {
@@ -490,7 +601,7 @@ def db_route():
     user_id = session.get("user_id")
 
     # Ensure user exists in DB (important after DB migrations)
-    user = User.query.get(user_id) if user_id else None
+    user = db.session.get(User, user_id) if user_id else None
     if not user:
         session.clear()
         return jsonify({"status": "error", "message": "User session invalid. Please login again."}), 401
@@ -548,4 +659,5 @@ def logout():
     return redirect(url_for("landing"))
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050, debug=False)
+    port = int(os.environ.get("PORT", 5050))
+    app.run(host="0.0.0.0", port=port, debug=True)

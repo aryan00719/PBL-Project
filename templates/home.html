@@ -1,41 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <meta charset="UTF-8">
+    <title>Dashboard - RouteWise</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="header-brand">
+                <i class="fa-solid fa-route text-primary"></i>
+                <a href="/" class="text-main" style="text-decoration: none;">RouteWise</a>
+            </div>
+            <nav class="header-nav">
+                <a href="/" class="btn btn-ghost">Planner</a>
+                <a href="/history" class="btn btn-ghost">History</a>
+                <a href="/logout" class="btn btn-ghost text-xs text-muted">Logout</a>
+            </nav>
+        </header>
 
-    <nav class="top-navbar">
-        <div class="nav-left">
-            <a href="/" class="logo">RouteWise</a>
-        </div>
-        <div class="nav-right">
-            <!-- <a href="/home">Home</a> -->
-            <a href="/planner">Planner</a>
-            <a href="/history">History</a>
-        </div>
-    </nav>
-    <div class="page-content">
+        <main class="container py-10" style="padding-top: 40px; padding-bottom: 40px;">
+            <div class="mb-8">
+                <h1 class="text-2xl mb-1">Welcome to RouteWise</h1>
+                <p class="text-muted text-sm">Where would you like to go today?</p>
+            </div>
 
-        <div class="dashboard-container main-content">
-            <h2>Welcome to Travel Planner</h2>
-
-            <div class="dashboard-cards">
-                <a href="/planner" class="dashboard-card">
-                    <h3>Create New Itinerary</h3>
-                    <p>Generate dynamic travel plans with intelligent routing.</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <!-- New Itinerary Card -->
+                <a href="/planner" class="card hover:shadow-lg transition flex flex-col items-center text-center p-8"
+                    style="text-decoration: none; color: inherit;">
+                    <div class="mb-4 text-primary bg-blue-50 p-4 rounded-full"
+                        style="background-color: #eff6ff; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-map-location-dot fa-3x"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Create New Itinerary</h3>
+                    <p class="text-muted text-sm mb-4">Generate dynamic travel plans with intelligent routing and
+                        optimizations.</p>
+                    <span class="btn btn-primary mt-auto">Start Planning</span>
                 </a>
 
-                <a href="/history" class="dashboard-card">
-                    <h3>View Trip History</h3>
-                    <p>Access your previously generated itineraries.</p>
+                <!-- History Card -->
+                <a href="/history" class="card hover:shadow-lg transition flex flex-col items-center text-center p-8"
+                    style="text-decoration: none; color: inherit;">
+                    <div class="mb-4 text-secondary bg-purple-50 p-4 rounded-full"
+                        style="background-color: #f3e8ff; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-clock-rotate-left fa-3x"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">View Trip History</h3>
+                    <p class="text-muted text-sm mb-4">Access your previously generated itineraries and saved trips.</p>
+                    <span class="btn btn-secondary mt-auto">View All Trips</span>
                 </a>
             </div>
-        </div>
-
+        </main>
     </div>
 </body>
 

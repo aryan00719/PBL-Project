@@ -90,6 +90,36 @@ def populate_delhi_data():
                 "entry_fee": "Free",
                 "opening_hours": "10:00 AM – 10:00 PM",
                 "best_time_to_visit": "Evening"
+            },
+            {
+                "name": "Jama Masjid",
+                "latitude": 28.6507,
+                "longitude": 77.2334,
+                "category": "Religious Site",
+                "visit_duration": "1 hour",
+                "entry_fee": "Free",
+                "opening_hours": "7:00 AM – 5:00 PM",
+                "best_time_to_visit": "Morning"
+            },
+            {
+                "name": "Akshardham Temple",
+                "latitude": 28.6127,
+                "longitude": 77.2773,
+                "category": "Temple",
+                "visit_duration": "3-4 hours",
+                "entry_fee": "Free",
+                "opening_hours": "10:00 AM – 8:00 PM",
+                "best_time_to_visit": "Evening"
+            },
+            {
+                "name": "Rashtrapati Bhavan",
+                "latitude": 28.6143,
+                "longitude": 77.1994,
+                "category": "Landmark",
+                "visit_duration": "1 hour",
+                "entry_fee": "₹50",
+                "opening_hours": "9:00 AM – 4:00 PM",
+                "best_time_to_visit": "Morning"
             }
         ]
 

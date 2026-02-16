@@ -3,41 +3,93 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>TravelAI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <title>RouteWise - AI Travel Planner</title>
     <!-- Main Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* Landing specific overrides */
+        .hero-bg {
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+            padding: 80px 0;
+            text-align: center;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            padding: 60px 0;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #4f46e5, #9333ea);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+    </style>
 </head>
 
-<body class="landing-body">
-
-    <nav class="top-navbar">
-        <div class="logo">RouteWise</div>
-
-        <div class="nav-links">
-            <a href="/" class="active">Home</a>
-            <a href="/planner">Planner</a>
-            <a href="/history">History</a>
-        </div>
-    </nav>
-
-    <section class="page-section hero-section">
-        <div class="hero-content">
-            <h1 class="page-title">Plan Smarter. Travel Better.</h1>
-
-            <p class="page-subtitle">
-                Procedural itinerary generation powered by real road networks,
-                intelligent routing, and time-aware location optimization.
-            </p>
-
-            <div class="landing-buttons">
-                <a href="/planner" class="landing-primary-btn">Create Itinerary</a>
-                <a href="/home" class="landing-secondary-btn">Dashboard</a>
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="header-brand">
+                <i class="fa-solid fa-route text-primary"></i>
+                <span>RouteWise</span>
             </div>
-        </div>
-    </section>
+            <nav class="header-nav">
+                <a href="/login" class="btn btn-ghost">Login</a>
+                <a href="/register" class="btn btn-primary">Sign Up</a>
+            </nav>
+        </header>
 
+        <!-- Hero Section -->
+        <section class="hero-bg">
+            <div class="container">
+                <h1 class="hero-title">Travel Smarter, Not Harder</h1>
+                <p class="text-xl text-muted mb-6" style="max-width: 600px; margin: 0 auto 30px;">
+                    AI-powered itineraries giving you the best routes, times, and prices for your next adventure.
+                </p>
+                <div class="flex justify-center gap-4">
+                    <a href="/register" class="btn btn-primary" style="padding: 12px 32px; font-size: 1.1rem;">Get
+                        Started Free</a>
+                    <a href="/login" class="btn btn-secondary" style="padding: 12px 32px; font-size: 1.1rem;">Login</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section class="container">
+            <div class="feature-grid">
+                <div class="card text-center hover:translate-y-1 transition">
+                    <div class="mb-4 text-primary"><i class="fa-solid fa-wand-magic-sparkles fa-3x"></i></div>
+                    <h3 class="mb-2 text-lg">AI Generated</h3>
+                    <p class="text-muted text-sm">Instantly create detailed day-by-day plans for any city.</p>
+                </div>
+                <div class="card text-center">
+                    <div class="mb-4 text-secondary"><i class="fa-solid fa-route fa-3x"></i></div>
+                    <h3 class="mb-2 text-lg">Smart Routing</h3>
+                    <p class="text-muted text-sm">Optimized paths to save time and fuel using real road data.</p>
+                </div>
+                <div class="card text-center">
+                    <div class="mb-4 text-warning"><i class="fa-solid fa-wallet fa-3x"></i></div>
+                    <h3 class="mb-2 text-lg">Budget Friendly</h3>
+                    <p class="text-muted text-sm">Estimated costs and ticket prices at a glance.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center py-10 border-t border-gray-200 mt-auto">
+            <p class="text-muted text-sm">© 2024 RouteWise. All rights reserved.</p>
+        </footer>
+    </div>
 </body>
 
 </html>

@@ -1,64 +1,156 @@
 let map;
 let routeLayers = [];
 let markers = [];
-
 let placeMarkerMap = {};
+let isEventListenersSetup = false;
 
-/* ---------------- MAP INIT ---------------- */
+/* ---------------- INITIALIZATION ---------------- */
 
 document.addEventListener("DOMContentLoaded", () => {
   initMap();
+  setupEventListeners();
+
+  // Check for URL params to auto-load route (e.g. from History)
+  const urlParams = new URLSearchParams(window.location.search);
+  const city = urlParams.get('city');
+  const days = urlParams.get('days');
+
+  if (city) {
+    const cityInput = document.getElementById("priority-input");
+    const daysInput = document.getElementById("days-input");
+    if (cityInput) cityInput.value = city;
+    if (daysInput && days) daysInput.value = days;
+
+    // Small delay to ensure map is ready
+    setTimeout(() => {
+      handleRoute();
+    }, 500);
+  }
+});
+
+function initMap() {
+  // Center roughly on India
+  map = L.map("map", { zoomControl: false }).setView([22.9734, 78.6569], 5);
+
+  // CartoDB Voyager - beautiful, colorful, clean
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20
+  }).addTo(map);
+
+  // Reposition zoom control
+  L.control.zoom({
+    position: 'bottomright'
+  }).addTo(map);
+}
+
+function setupEventListeners() {
+  if (isEventListenersSetup) return;
+  isEventListenersSetup = true;
 
   const generateBtn = document.getElementById("generate-btn");
+  const closeInstructionsBtn = document.getElementById("close-instructions");
+
+  // Panel Toggles
+  const toggleItineraryBtn = document.getElementById("toggle-itinerary");
+  const openItineraryBtn = document.getElementById("open-itinerary-btn");
+
   if (generateBtn) {
     generateBtn.addEventListener("click", (e) => {
       e.preventDefault();
       handleRoute();
     });
   }
-});
 
-function initMap() {
-  map = L.map("map").setView([22.9734, 78.6569], 5); // India center
+  if (closeInstructionsBtn) {
+    closeInstructionsBtn.addEventListener("click", () => {
+      document.getElementById("route-instructions").classList.add("hidden");
+    });
+  }
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap"
-  }).addTo(map);
+  if (toggleItineraryBtn) {
+    toggleItineraryBtn.addEventListener("click", () => {
+      toggleItineraryPanel(false); // collapse
+    });
+  }
+
+  if (openItineraryBtn) {
+    openItineraryBtn.addEventListener("click", () => {
+      toggleItineraryPanel(true); // expand
+    });
+  }
 }
 
-/* ---------------- HELPERS ---------------- */
+/* ---------------- UI LOGIC ---------------- */
+
+function toggleItineraryPanel(show) {
+  const panel = document.getElementById("itinerary-panel");
+  const openBtn = document.getElementById("open-itinerary-btn");
+
+  if (show) {
+    panel.classList.remove("collapsed");
+    openBtn.style.display = "none";
+  } else {
+    panel.classList.add("collapsed");
+    openBtn.style.display = "block";
+  }
+
+  setTimeout(() => { map.invalidateSize(); }, 300);
+}
+
+function showLoader() {
+  document.getElementById("loading-overlay").classList.remove("hidden");
+}
+
+function hideLoader() {
+  document.getElementById("loading-overlay").classList.add("hidden");
+}
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+
+  let icon = type === 'success' ? '<i class="fa-solid fa-check-circle"></i>' : '<i class="fa-solid fa-info-circle"></i>';
+  if (type === 'error') icon = '<i class="fa-solid fa-exclamation-circle"></i>';
+
+  toast.innerHTML = `${icon} <span>${message}</span>`;
+
+  container.appendChild(toast);
+
+  // Auto remove
+  setTimeout(() => {
+    toast.style.animation = "slideIn 0.3s ease-in reverse";
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
 
 function clearMap() {
+  console.log("Clearing map and state...");
   routeLayers.forEach(l => map.removeLayer(l));
   markers.forEach(m => map.removeLayer(m));
   routeLayers = [];
   markers = [];
   placeMarkerMap = {};
+  document.getElementById("instruction-list").innerHTML = "";
+  document.getElementById("route-instructions").classList.add("hidden");
+
+  // Also clear itinerary container here to be safe, or just in renderItinerary
+  const itineraryContainer = document.getElementById("itinerary");
+  if (itineraryContainer) itineraryContainer.innerHTML = "";
 }
 
-function showLoader() {
-  const l = document.getElementById("loading-overlay");
-  if (l) l.style.display = "flex";
-}
 
-function hideLoader() {
-  const l = document.getElementById("loading-overlay");
-  if (l) l.style.display = "none";
-}
-
-/* ---------------- MAIN ROUTE HANDLER ---------------- */
+/* ---------------- ROUTING LOGIC ---------------- */
 
 async function handleRoute() {
   const cityInput = document.getElementById("priority-input");
   const daysInput = document.getElementById("days-input");
 
   if (!cityInput || !cityInput.value.trim()) {
-    alert("Please enter a city name.");
-    return;
-  }
-
-  if (!daysInput || !daysInput.value) {
-    alert("Please enter number of days.");
+    showToast("Please enter a destination city", "error");
+    cityInput.focus();
     return;
   }
 
@@ -66,72 +158,41 @@ async function handleRoute() {
   const days = parseInt(daysInput.value);
 
   if (isNaN(days) || days < 1 || days > 14) {
-    alert("Days must be between 1 and 14.");
+    showToast("Days must be between 1 and 14", "error");
     return;
   }
 
   await fetchDBRoute(city, days);
 }
 
-/* ---------------- ANIMATED POLYLINE ---------------- */
-
-function animatePolyline(latLngs, options = {}) {
-  const {
-    color = "blue",
-    weight = 5,
-    delay = 15
-  } = options;
-
-  let index = 0;
-  const animatedLine = L.polyline([], {
-    color,
-    weight,
-    opacity: 0.9,
-    lineCap: "round",
-    lineJoin: "round"
-  }).addTo(map);
-
-  const interval = setInterval(() => {
-    if (index >= latLngs.length) {
-      clearInterval(interval);
-      return;
-    }
-    animatedLine.addLatLng(latLngs[index]);
-    index++;
-  }, delay);
-
-  return animatedLine;
-}
-
-/* ---------------- FETCH FROM BACKEND ---------------- */
-
 async function fetchDBRoute(city, days) {
   showLoader();
-  clearMap();
+  clearMap(); // Ensure state is clean before we start
+
+  console.log(`Fetching route for city: ${city}, days: ${days}`);
+
+  // Collapse itinerary on mobile to show map initially? Or keep it open?
+  // Let's keep it open if desktop, maybe collapse on mobile.
+  if (window.innerWidth < 768) toggleItineraryPanel(false);
 
   try {
     const res = await fetch("/api/db-route", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      credentials: "same-origin",
-      body: JSON.stringify({
-        city: city,
-        days: days
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ city, days })
     });
 
-    if (!res.ok) throw new Error("Backend error");
-
+    if (!res.ok) throw new Error("Server error");
     const data = await res.json();
 
     if (!data || data.status !== "success" || !Array.isArray(data.days)) {
-      alert("Could not load itinerary data");
+      showToast("Could not generate itinerary. Try another city.", "error");
       return;
     }
 
-    // Center map on city if available
+    showToast(`Itinerary generated for ${data.days.length} days!`, "success");
+
+    // Center map
     if (data.city && (data.city.lat || data.city.latitude) && (data.city.lng || data.city.longitude)) {
       const lat = data.city.lat || data.city.latitude;
       const lng = data.city.lng || data.city.longitude;
@@ -141,157 +202,206 @@ async function fetchDBRoute(city, days) {
     renderRoutes(data.days);
     renderItinerary(data.days);
 
-    console.log("DB days:", data.days);
+    // Open panel if collapsed
+    toggleItineraryPanel(true);
+
   } catch (err) {
-    console.error("Routing error:", err);
+    console.error(err);
+    showToast("Something went wrong. Please check console.", "error");
   } finally {
     hideLoader();
   }
-
-  setTimeout(() => {
-    map.invalidateSize(true);
-  }, 800);
 }
 
-/* ---------------- ROUTE DRAWING (FIXED) ---------------- */
+/* ---------------- RENDERING ---------------- */
 
-const routeColors = ["#1E90FF", "#32CD32", "#FF8C00", "#8A2BE2"];
+const routeColors = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+
+function createCustomIcon(number, color) {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="
+            background-color: ${color};
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            position: relative;
+        ">
+            <div class="marker-pulse" style="color: ${color}; border-color: ${color};"></div>
+            ${number}
+        </div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12]
+  });
+}
 
 function renderRoutes(days) {
   const allLatLngs = [];
   let anyRouteDrawn = false;
+  let instructionHtml = "";
 
-  days.forEach((day, idx) => {
+  days.forEach((day, dayIdx) => {
+    const color = routeColors[dayIdx % routeColors.length];
 
-    /* ---- DRAW ROUTES ---- */
-    if (Array.isArray(day.route) && day.route.length > 0) {
-
-      // CASE 1: Flat route array [[lat,lng], [lat,lng], ...]
-      if (Array.isArray(day.route[0]) && typeof day.route[0][0] === "number") {
-
-        if (day.route.length >= 2) {
-          const animatedRoute = animatePolyline(day.route, {
-            color: routeColors[idx % routeColors.length],
-            weight: 5,
-            delay: 18
-          });
-
-          routeLayers.push(animatedRoute);
-          anyRouteDrawn = true;
-
-          day.route.forEach(p => {
-            if (Array.isArray(p) && p.length === 2) {
-              allLatLngs.push([p[0], p[1]]);
-            }
-          });
-        }
-
-      } else {
-
-        // CASE 2: Nested segments [[[lat,lng]...], [[lat,lng]...]]
-        day.route.forEach((segment) => {
-          if (!Array.isArray(segment) || segment.length < 2) return;
-
-          const animatedRoute = animatePolyline(segment, {
-            color: routeColors[idx % routeColors.length],
-            weight: 5,
-            delay: 18
-          });
-
-          routeLayers.push(animatedRoute);
-          anyRouteDrawn = true;
-
-          segment.forEach(p => {
-            if (Array.isArray(p) && p.length === 2) {
-              allLatLngs.push([p[0], p[1]]);
-            }
-          });
-        });
-
-      }
-    }
-
-    /* ---- CREATE PLACE MARKERS ---- */
+    // Markers
     if (Array.isArray(day.places)) {
-      day.places.forEach(place => {
-
+      day.places.forEach((place, placeIdx) => {
         const lat = place.lat || place.latitude;
         const lng = place.lng || place.longitude;
 
-        if (!lat || !lng) return;
+        if (lat && lng) {
+          const marker = L.marker([lat, lng], {
+            icon: createCustomIcon(placeIdx + 1, color)
+          }).addTo(map);
 
-        const popupHTML = `
-          <div class="popup-card">
-            <h4>${place.name}</h4>
-            <p><strong>Category:</strong> ${place.category || "Tourist Place"}</p>
-            <p><strong>Best Time:</strong> ${place.best_time_to_visit || "Morning"}</p>
-            <p><strong>Opening:</strong> ${place.opening_time || "Not Available"}</p>
-            <p><strong>Closing:</strong> ${place.closing_time || "Not Available"}</p>
-            <p><strong>Ticket Price:</strong> ${place.ticket_price || "Free"}</p>
-          </div>
-        `;
+          const popupContent = `
+                    <div style="min-width: 200px;">
+                        <h4 style="margin:0 0 5px 0; color:${color}; font-weight:700;">${place.name}</h4>
+                        <div style="font-size:12px; color:#555;">
+                            <p style="margin:2px 0;"><strong>Time:</strong> ${place.best_time_to_visit || "Daytime"}</p>
+                            <p style="margin:2px 0;"><strong>Ticket:</strong> ${place.ticket_price || "Free"}</p>
+                        </div>
+                    </div>
+                `;
 
-        const marker = L.marker([lat, lng])
-          .addTo(map)
-          .bindPopup(popupHTML);
-
-        markers.push(marker);
-
-        if (place.name) {
+          marker.bindPopup(popupContent);
+          markers.push(marker);
           placeMarkerMap[place.name] = marker;
         }
+      });
+    }
+
+    // Routes (Polylines)
+    if (Array.isArray(day.route) && day.route.length > 0) {
+      // Flatten logic for different route formats
+      let segments = [];
+
+      // Check structure: [[lat,lng],...] vs [[[lat,lng]...],...]
+      if (Array.isArray(day.route[0]) && typeof day.route[0][0] === "number") {
+        segments.push(day.route); // Single segment
+      } else {
+        segments = day.route; // Multiple segments
+      }
+
+      segments.forEach(segment => {
+        if (!Array.isArray(segment) || segment.length < 2) return;
+
+        // Glow/Shadow effect
+        const glowPolyline = L.polyline(segment, {
+          color: color,
+          weight: 10,
+          opacity: 0.3,
+          className: 'route-glow'
+        }).addTo(map).bringToBack();
+        routeLayers.push(glowPolyline);
+
+        const polyline = L.polyline(segment, {
+          color: color,
+          weight: 5,
+          opacity: 1.0,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(map);
+        routeLayers.push(polyline);
+
+        anyRouteDrawn = true;
+
+        segment.forEach(pt => allLatLngs.push(pt));
       });
     }
   });
 
   if (anyRouteDrawn && allLatLngs.length > 0) {
-    map.fitBounds(allLatLngs, { padding: [40, 40] });
-  } else {
-    console.warn("No valid routes drawn");
+    map.fitBounds(allLatLngs, { padding: [50, 50] });
   }
 }
 
-/* ---------------- ITINERARY UI ---------------- */
 
 function renderItinerary(days) {
+  console.log("Rendering Itinerary...", days);
   const container = document.getElementById("itinerary");
   if (!container) return;
 
+  // Crucial: Clear container first
   container.innerHTML = "";
 
-  days.forEach(day => {
+  days.forEach((day, idx) => {
+    const dayColor = routeColors[idx % routeColors.length];
+
     const dayCard = document.createElement("div");
-    dayCard.className = "itinerary-card";
+    dayCard.className = "day-card";
 
-    const title = document.createElement("h3");
-    title.textContent = day.day;
-    dayCard.appendChild(title);
+    // Header
+    const header = document.createElement("div");
+    header.className = "day-header";
+    // Check if day.day already has "Day" prefix
+    const dayLabel = day.day.toString().toLowerCase().startsWith("day") ? day.day : `Day ${day.day}`;
 
-    const list = document.createElement("ul");
+    header.innerHTML = `
+        <span style="color: ${dayColor}">${dayLabel}</span>
+        <span class="text-xs text-muted">${day.places.length} stops</span>
+    `;
+    dayCard.appendChild(header);
 
-    day.places.forEach(place => {
-      const li = document.createElement("li");
-      li.style.cursor = "pointer";
+    // Places List
+    const placeList = document.createElement("div");
 
-      li.innerHTML = `
-        <strong>${place.name}</strong><br/>
-        <span class="itinerary-note">
-          ${place.category || "Popular tourist spot"}
-        </span>
-      `;
+    day.places.forEach((place, placeIdx) => {
+      const item = document.createElement("div");
+      item.className = "place-item";
 
-      li.addEventListener("click", () => {
+      // CSS trick for strict coloring of the dot using variable not fully supported inline easily without style attr
+      // We'll use border-left instead for easy visualization or custom style
+      item.style.borderLeft = `3px solid transparent`;
+
+      item.innerHTML = `
+            <div class="place-name">${placeIdx + 1}. ${place.name}</div>
+            <div class="place-meta">${place.category || "Sightseeing"} • ${place.time_spent || "1h"}</div>
+        `;
+
+      item.addEventListener("mouseenter", () => {
+        item.style.borderLeftColor = dayColor;
+        item.style.backgroundColor = "var(--color-surface-hover)";
+        // Highlight marker
         const marker = placeMarkerMap[place.name];
         if (marker) {
-          map.setView(marker.getLatLng(), 14);
-          marker.openPopup();
+          marker.setOpacity(1);
+          marker._icon.style.transform += " scale(1.2)";
         }
       });
 
-      list.appendChild(li);
+      item.addEventListener("mouseleave", () => {
+        item.style.borderLeftColor = "transparent";
+        item.style.backgroundColor = "";
+        const marker = placeMarkerMap[place.name];
+        if (marker) {
+          marker._icon.style.transform = marker._icon.style.transform.replace(" scale(1.2)", "");
+        }
+      });
+
+      item.addEventListener("click", () => {
+        const marker = placeMarkerMap[place.name];
+        if (marker) {
+          map.setView(marker.getLatLng(), 15);
+          marker.openPopup();
+          // Mobile: close panel to see map
+          if (window.innerWidth < 768) toggleItineraryPanel(false);
+        }
+      });
+
+      placeList.appendChild(item);
     });
 
-    dayCard.appendChild(list);
+    dayCard.appendChild(placeList);
     container.appendChild(dayCard);
   });
 }

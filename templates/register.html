@@ -3,82 +3,73 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Register | Procedural Travel Planner</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Register - RouteWise</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-glass);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+    </style>
 </head>
 
-<body class="auth-body">
-
-    <div class="auth-container">
-
-        <div class="auth-card">
-            <h2>Create Your Travel Account</h2>
-            <p class="auth-subtitle">Register to plan, save, and manage your personalized travel routes</p>
-
-            <form method="POST" action="{{ url_for('register') }}" class="auth-form">
-
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                    <div class="flash {{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                {% endwith %}
-
-                <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text" name="name" required placeholder="Enter your full name" autocomplete="name">
-                </div>
-
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" name="email" required placeholder="Enter your email" autocomplete="email">
-                </div>
-
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="password" required placeholder="Create a password (min 8 characters)"
-                        minlength="8" autocomplete="new-password">
-                    <small class="input-hint">Use at least 8 characters including letters and numbers.</small>
-                </div>
-
-                <div class="form-group">
-                    <label>Confirm Password</label>
-                    <input type="password" name="confirm_password" required placeholder="Re-enter your password"
-                        minlength="8" autocomplete="new-password">
-                </div>
-
-                <div class="form-extra">
-                    <label class="checkbox-label">
-                        <input type="checkbox" required>
-                        I agree to the Terms & Conditions
-                    </label>
-                </div>
-
-                <button type="submit" class="primary-btn">
-                    Register
-                </button>
-
-            </form>
-
-            <div class="auth-footer">
-                <p>
-                    Already have an account?
-                    <a href="{{ url_for('login') }}">Login here</a>
-                </p>
-            </div>
-
-            <div class="auth-footer secondary">
-                <a href="{{ url_for('landing') }}">← Back to Landing</a>
-            </div>
-
+<body>
+    <div class="auth-card">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-primary mb-1"><i class="fa-solid fa-route"></i> RouteWise</h1>
+            <p class="text-muted text-sm">Create your account to start planning.</p>
         </div>
 
-    </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="toast {{ 'success' if category == 'success' else 'error' }} mb-4"
+            style="position:static; transform:none; opacity:1;">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
 
+        <form method="POST" action="/register">
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="input-control" required placeholder="Enter your email">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="input-control" required placeholder="Create a password">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block mt-4">Sign Up</button>
+        </form>
+
+        <div class="text-center mt-6 text-sm">
+            <span class="text-muted">Already have an account?</span>
+            <a href="/login" class="font-medium">Login</a>
+        </div>
+        <div class="text-center mt-2">
+            <a href="/" class="text-xs text-muted">Back to Home</a>
+        </div>
+    </div>
 </body>
 
 </html>

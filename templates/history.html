@@ -3,113 +3,130 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Trip History</title>
+    <title>My Trips - RouteWise</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 
-<body class="history-body">
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="header-brand">
+                <i class="fa-solid fa-route text-primary"></i>
+                <a href="/" class="text-main" style="text-decoration: none;">RouteWise</a>
+            </div>
+            <nav class="header-nav">
+                <a href="/" class="btn btn-ghost">Planner</a>
+                <a href="/history" class="btn btn-ghost text-primary font-medium">History</a>
+                <a href="/logout" class="btn btn-ghost text-xs text-muted">Logout</a>
+            </nav>
+        </header>
 
-    <nav class="top-navbar">
-        <div class="nav-left">
-            <a href="/" class="logo">RouteWise</a>
-        </div>
-        <div class="nav-right">
-            <a href="/home">Home</a>
-            <a href="/planner">Planner</a>
-        </div>
-    </nav>
-
-    <div class="history-page container">
-
-        <div class="history-header">
-            <h1 class="history-title">🧭 Trip History</h1>
-            <p class="history-subtitle">Review your previously generated itineraries</p>
-        </div>
-
-        {% for trip in trips %}
-        <div class="trip-card">
-
-            <div class="trip-top">
-                <div class="trip-meta">
-                    <h2 class="trip-city">{{ trip.city.title() }}</h2>
-                    <span class="trip-date">{{ trip.timestamp }}</span>
+        <main class="container py-10" style="padding-top: 40px; padding-bottom: 40px;">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-2xl mb-1 font-bold">Your Trip History</h1>
+                    <p class="text-muted text-sm">Review your past generated itineraries.</p>
                 </div>
-                <div class="trip-actions">
-                    <span class="trip-days">{{ trip.days }} Days</span>
-                    {% if trip.itinerary %}
-                    <button class="trip-toggle">View Details</button>
-                    {% endif %}
-                </div>
+                <a href="/planner" class="btn btn-primary shadow-md"><i class="fa-solid fa-plus"></i> New Trip</a>
             </div>
 
-            <div class="trip-details">
+            {% if history %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
+                {% for item in history %}
+                <div class="card trip-card hover:shadow-lg transition animate-slide-up"
+                    data-delay="{{ (loop.index0 * 0.1)|round(1) }}">
 
-                {% if trip.prompt %}
-                <div class="trip-section">
-                    <strong>📝 Prompt</strong>
-                    <p>{{ trip.prompt }}</p>
+                    <!-- Card Header -->
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl text-primary font-bold mb-1">{{ item.city }}</h3>
+                            <div class="text-xs text-muted flex items-center gap-1">
+                                <i class="fa-regular fa-calendar"></i> {{ item.timestamp.split(' ')[0] if item.timestamp
+                                else 'Revent' }}
+                            </div>
+                        </div>
+                        <span class="badge badge-primary">{{ item.days }} Days</span>
+                    </div>
+
+                    <!-- Summary -->
+                    <p class="text-sm text-secondary mb-4">
+                        A {{ item.days }}-day trip exploring the best of {{ item.city }}.
+                    </p>
+
+                    <!-- Details Section (Timeline) -->
+                    <div id="details-{{ loop.index }}" class="mt-4 pt-4 border-t border-gray-100 hidden">
+                        <h4 class="text-xs font-bold text-muted uppercase tracking-wider mb-3">Itinerary Highlights</h4>
+                        {% if item.places %}
+                        <div class="timeline-list">
+                            {% for place in item.places[:3] %}
+                            <div class="timeline-item">
+                                <div class="text-sm font-medium">{{ place.name }}</div>
+                                <div class="text-xs text-muted">{{ place.category }}</div>
+                            </div>
+                            {% endfor %}
+                            {% if item.places|length > 3 %}
+                            <div class="timeline-item">
+                                <div class="text-xs text-muted italic">+ {{ item.places|length - 3 }} more stops</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-muted">No details available.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="card-footer">
+                        <a href="/planner?city={{ item.city }}&days={{ item.days }}"
+                            class="btn btn-primary btn-sm flex-1 text-xs justify-center">
+                            <i class="fa-solid fa-map-show"></i> View Map
+                        </a>
+                        <button class="btn btn-secondary btn-sm flex-1 view-details-btn text-xs justify-center"
+                            onclick="toggleDetails('details-{{ loop.index }}')">
+                            <i class="fa-solid fa-list-timeline"></i> <span
+                                id="btn-text-{{ loop.index }}">Details</span>
+                        </button>
+                    </div>
                 </div>
-                {% endif %}
-
-                {% if trip.places %}
-                <div class="trip-section">
-                    <strong>🏛️ Places Covered</strong>
-                    <p>{{ trip.places | join(', ') }}</p>
-                </div>
-                {% endif %}
-
-                {% if trip.food %}
-                <div class="trip-section">
-                    <strong>🍽️ Food Suggestions</strong>
-                    <p>{{ trip.food | join(', ') }}</p>
-                </div>
-                {% endif %}
-
-                {% if trip.itinerary %}
-                <div class="trip-section">
-                    <strong>📍 Itinerary Details</strong>
-                    <ol class="itinerary-list">
-                        {% for step in trip.itinerary %}
-                        <li class="itinerary-step">
-                            <span class="step-number">{{ loop.index }}.</span>
-                            <span class="step-text">{{ step }}</span>
-                        </li>
-                        {% endfor %}
-                    </ol>
-                </div>
-                {% endif %}
-
+                {% endfor %}
             </div>
-
-        </div>
-        {% else %}
-        <div class="no-trips">
-            <h3>No trips saved yet</h3>
-            <p>Generate your first itinerary to see it here.</p>
-        </div>
-        {% endfor %}
-
-        <div class="history-footer">
-            <a href="/" class="btn-primary">← Back to Map</a>
-        </div>
-
+            {% else %}
+            <div class="empty-state animate-slide-up">
+                <div class="empty-state-icon">
+                    <i class="fa-solid fa-suitcase-rolling"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-2">No trips yet</h3>
+                <p class="text-muted mb-6 max-w-md mx-auto">Your travel history is empty. Start planning your first
+                    adventure today!</p>
+                <a href="/planner" class="btn btn-primary btn-lg"><i class="fa-solid fa-wand-magic-sparkles"></i> Start
+                    Planning</a>
+            </div>
+            {% endif %}
+        </main>
     </div>
 
     <script>
+        function toggleDetails(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                el.classList.add('fade-in');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
         document.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll(".trip-toggle").forEach(button => {
-                button.addEventListener("click", () => {
-                    const card = button.closest(".trip-card");
-                    const details = card.querySelector(".trip-details");
-                    details.classList.toggle("active");
-                    button.textContent = details.classList.contains("active")
-                        ? "Hide Details"
-                        : "View Details";
-                });
+            document.querySelectorAll(".animate-slide-up").forEach(card => {
+                const delay = card.dataset.delay;
+                if (delay) {
+                    card.style.animationDelay = delay + "s";
+                }
             });
         });
     </script>
-
 </body>
 
 </html>
