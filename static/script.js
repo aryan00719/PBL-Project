@@ -7,6 +7,7 @@ let isEventListenersSetup = false;
 /* ---------------- INITIALIZATION ---------------- */
 
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM Loaded, initializing script...");
   initMap();
   setupEventListeners();
 
@@ -57,10 +58,14 @@ function setupEventListeners() {
   const openItineraryBtn = document.getElementById("open-itinerary-btn");
 
   if (generateBtn) {
+    console.log("Generate button found, attaching listener");
     generateBtn.addEventListener("click", (e) => {
+      console.log("Generate button clicked");
       e.preventDefault();
       handleRoute();
     });
+  } else {
+    console.error("Generate button NOT found!");
   }
 
   if (closeInstructionsBtn) {
@@ -176,13 +181,22 @@ async function fetchDBRoute(city, days) {
   if (window.innerWidth < 768) toggleItineraryPanel(false);
 
   try {
+    console.log("Sending POST request to /api/db-route");
     const res = await fetch("/api/db-route", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ city, days })
     });
 
-    if (!res.ok) throw new Error("Server error");
+    console.log("Fetch response received:", res.status, res.url);
+
+    if (res.redirected && res.url.includes("/login")) {
+      showToast("Session expired. Please log in again.", "error");
+      setTimeout(() => window.location.href = "/login", 2000);
+      return;
+    }
+
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
     const data = await res.json();
 
     if (!data || data.status !== "success" || !Array.isArray(data.days)) {
