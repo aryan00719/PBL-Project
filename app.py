@@ -563,12 +563,29 @@ def generate_procedural_itinerary(city_name, days):
 
 @app.route("/")
 def landing():
-    return render_template("landing.html")
+    try:
+        return render_template("landing.html")
+    except Exception as e:
+        logger.error(f"Error rendering landing page: {e}")
+        return "Error loading landing page", 500
 
 @app.route("/home")
 @login_required
 def home():
     return render_template("home.html")
+
+# ... (omitted similar lines for brevity, target carefully) ...
+
+@app.route("/logout")
+def logout():
+    try:
+        logger.info("Logging out user...")
+        session.clear()
+        logger.info("Session cleared. Redirecting to landing.")
+        return redirect(url_for("landing"))
+    except Exception as e:
+        logger.error(f"Error during logout: {e}")
+        return redirect(url_for("landing")) # Fallback
 
 @app.route("/planner")
 @login_required
@@ -653,10 +670,7 @@ def register():
     return render_template("register.html")
 
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("landing"))
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
