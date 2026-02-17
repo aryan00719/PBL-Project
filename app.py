@@ -271,8 +271,8 @@ def get_city_graph(city_name, lat=None, lng=None):
         # graph_from_place uses complex polygon clipping which causes OOM on small servers (like Render free tier).
         # graph_from_point with a radius is much lighter on memory.
         if lat is not None and lng is not None:
-             logger.info(f"Using point-based download for {city_name} (15km radius)")
-             G = ox.graph_from_point((lat, lng), dist=15000, network_type="drive")
+             logger.info(f"Using point-based download for {city_name} (6km radius)")
+             G = ox.graph_from_point((lat, lng), dist=6000, network_type="drive")
         else:
              # Fallback if no coords provided (shouldn't happen with updated logic)
              logger.info(f"Using place-based download for {city_name}")
@@ -640,9 +640,16 @@ def db_route():
     if not city:
         return jsonify({"status": "error", "message": "City required"}), 400
 
-    itinerary = generate_procedural_itinerary(city, days)
+    try:
+        itinerary = generate_procedural_itinerary(city, days)
+    except Exception as e:
+        logger.error(f"CRITICAL ERROR in itinerary gen: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": f"Server crash: {str(e)}"}), 500
+
     if not itinerary:
-        return jsonify({"status": "error", "message": "No data found"}), 404
+        return jsonify({"status": "error", "message": "No data found for this city"}), 404
 
     user_id = session.get("user_id")
 
