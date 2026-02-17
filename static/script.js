@@ -196,7 +196,11 @@ async function fetchDBRoute(city, days) {
       return;
     }
 
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      console.error("Server Error Details:", errData);
+      throw new Error(`Server error: ${res.status} - ${errData.message || res.statusText}`);
+    }
     const data = await res.json();
 
     if (!data || data.status !== "success" || !Array.isArray(data.days)) {
