@@ -150,93 +150,69 @@ class Trip(db.Model):
 
 
 def seed_data():
-    if City.query.first():
-        return  # already seeded
+    # 1. Ensure Cities Exist
+    jaipur = City.query.filter_by(name="Jaipur").first()
+    if not jaipur:
+        jaipur = City(name="Jaipur", lat=26.9124, lng=75.7873)
+        db.session.add(jaipur)
+        print("✅ Added city: Jaipur")
 
-    jaipur = City(name="Jaipur", lat=26.9124, lng=75.7873)
-    delhi = City(name="Delhi", lat=28.6139, lng=77.2090)
+    delhi = City.query.filter_by(name="Delhi").first()
+    if not delhi:
+        delhi = City(name="Delhi", lat=28.6139, lng=77.2090)
+        db.session.add(delhi)
+        print("✅ Added city: Delhi")
 
-    db.session.add_all([jaipur, delhi])
     db.session.commit()
 
-    # Add 2–3 demo sites
-    site1 = Site(
-        city_id=jaipur.id,
-        name="Hawa Mahal",
-        latitude=26.9239,
-        longitude=75.8267,
-        category="Monument",
-        best_time_to_visit="Morning"
-    )
+    # 2. Define Sites Data
+    sites_data = [
+        # --- JAIPUR ---
+        {"city_id": jaipur.id, "name": "Hawa Mahal", "latitude": 26.9239, "longitude": 75.8267, "category": "Monument", "best_time_to_visit": "Morning"},
+        {"city_id": jaipur.id, "name": "Amer Fort", "latitude": 26.9855, "longitude": 75.8513, "category": "Fort", "best_time_to_visit": "Morning"},
+        {"city_id": jaipur.id, "name": "City Palace", "latitude": 26.9258, "longitude": 75.8237, "category": "Palace", "best_time_to_visit": "Afternoon"},
+        {"city_id": jaipur.id, "name": "Jal Mahal", "latitude": 26.9535, "longitude": 75.8462, "category": "Lake Palace", "best_time_to_visit": "Evening"},
+        {"city_id": jaipur.id, "name": "Nahargarh Fort", "latitude": 26.9368, "longitude": 75.8160, "category": "Fort", "best_time_to_visit": "Evening"},
+        {"city_id": jaipur.id, "name": "Albert Hall Museum", "latitude": 26.9124, "longitude": 75.8196, "category": "Museum", "best_time_to_visit": "Afternoon"},
+        {"city_id": jaipur.id, "name": "Jantar Mantar", "latitude": 26.9248, "longitude": 75.8246, "category": "Observatory", "best_time_to_visit": "Morning"},
+        
+        # --- DELHI ---
+        {"city_id": delhi.id, "name": "India Gate", "latitude": 28.6129, "longitude": 77.2295, "category": "Monument", "best_time_to_visit": "Evening", "visit_duration": "1-2 hours", "ticket_price": "Free", "opening_time": "24 hours", "closing_time": "24 hours"},
+        {"city_id": delhi.id, "name": "Red Fort", "latitude": 28.6562, "longitude": 77.2410, "category": "Historical Fort", "best_time_to_visit": "Morning", "visit_duration": "2-3 hours", "ticket_price": "₹35 / ₹500", "opening_time": "9:30 AM", "closing_time": "4:30 PM"},
+        {"city_id": delhi.id, "name": "Qutub Minar", "latitude": 28.5244, "longitude": 77.1855, "category": "Historical Monument", "best_time_to_visit": "Morning", "visit_duration": "1-2 hours", "ticket_price": "₹40 / ₹600", "opening_time": "7:00 AM", "closing_time": "5:00 PM"},
+        {"city_id": delhi.id, "name": "Humayun’s Tomb", "latitude": 28.5933, "longitude": 77.2507, "category": "Historical Monument", "best_time_to_visit": "Afternoon", "visit_duration": "1-2 hours", "ticket_price": "₹40 / ₹600", "opening_time": "6:00 AM", "closing_time": "6:00 PM"},
+        {"city_id": delhi.id, "name": "Lotus Temple", "latitude": 28.5535, "longitude": 77.2588, "category": "Religious Site", "best_time_to_visit": "Evening", "visit_duration": "1 hour", "ticket_price": "Free", "opening_time": "9:00 AM", "closing_time": "5:00 PM"},
+        {"city_id": delhi.id, "name": "Connaught Place", "latitude": 28.6315, "longitude": 77.2167, "category": "Market", "best_time_to_visit": "Evening", "visit_duration": "2-3 hours", "ticket_price": "Free", "opening_time": "10:00 AM", "closing_time": "10:00 PM"},
+        {"city_id": delhi.id, "name": "Jama Masjid", "latitude": 28.6507, "longitude": 77.2334, "category": "Religious Site", "best_time_to_visit": "Morning", "visit_duration": "1 hour", "ticket_price": "Free", "opening_time": "7:00 AM", "closing_time": "5:00 PM"},
+        {"city_id": delhi.id, "name": "Akshardham Temple", "latitude": 28.6127, "longitude": 77.2773, "category": "Temple", "best_time_to_visit": "Evening", "visit_duration": "3-4 hours", "ticket_price": "Free", "opening_time": "10:00 AM", "closing_time": "8:00 PM"},
+        {"city_id": delhi.id, "name": "Rashtrapati Bhavan", "latitude": 28.6143, "longitude": 77.1994, "category": "Landmark", "best_time_to_visit": "Morning", "visit_duration": "1 hour", "ticket_price": "₹50", "opening_time": "9:00 AM", "closing_time": "4:00 PM"}
+    ]
 
-    site2 = Site(
-        city_id=delhi.id,
-        name="India Gate",
-        latitude=28.6129,
-        longitude=77.2295,
-        category="Monument",
-        best_time_to_visit="Evening"
-    )
-
-    site3 = Site(
-        city_id=jaipur.id,
-        name="Amer Fort",
-        latitude=26.9855,
-        longitude=75.8513,
-        category="Fort",
-        best_time_to_visit="Morning"
-    )
-
-    site4 = Site(
-        city_id=jaipur.id,
-        name="City Palace",
-        latitude=26.9258,
-        longitude=75.8237,
-        category="Palace",
-        best_time_to_visit="Afternoon"
-    )
-
-    site5 = Site(
-        city_id=jaipur.id,
-        name="Jal Mahal",
-        latitude=26.9535,
-        longitude=75.8462,
-        category="Lake Palace",
-        best_time_to_visit="Evening"
-    )
-
-    site6 = Site(
-        city_id=jaipur.id,
-        name="Nahargarh Fort",
-        latitude=26.9368,
-        longitude=75.8160,
-        category="Fort",
-        best_time_to_visit="Evening"
-    )
-
-    site7 = Site(
-        city_id=jaipur.id,
-        name="Albert Hall Museum",
-        latitude=26.9124,
-        longitude=75.8196,
-        category="Museum",
-        best_time_to_visit="Afternoon"
-    )
-
-    site8 = Site(
-        city_id=jaipur.id,
-        name="Jantar Mantar",
-        latitude=26.9248,
-        longitude=75.8246,
-        category="Observatory",
-        best_time_to_visit="Morning"
-    )
-
-    db.session.add_all([
-        site1, site2, site3, site4,
-        site5, site6, site7, site8
-    ])
-    db.session.commit()
+    # 3. Add Sites if Missing
+    added_sites = 0
+    for s_data in sites_data:
+        existing = Site.query.filter_by(name=s_data["name"], city_id=s_data["city_id"]).first()
+        if not existing:
+            site = Site(
+                city_id=s_data["city_id"],
+                name=s_data["name"],
+                latitude=s_data["latitude"],
+                longitude=s_data["longitude"],
+                category=s_data.get("category"),
+                best_time_to_visit=s_data.get("best_time_to_visit"),
+                visit_duration=s_data.get("visit_duration"),
+                ticket_price=s_data.get("ticket_price"),
+                opening_time=s_data.get("opening_time"),
+                closing_time=s_data.get("closing_time")
+            )
+            db.session.add(site)
+            added_sites += 1
+    
+    if added_sites > 0:
+        db.session.commit()
+        print(f"✅ Added {added_sites} new sites.")
+    else:
+        print("ℹ️ All sites already exist.")
 
 with app.app_context():
     db.create_all()
