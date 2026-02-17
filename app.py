@@ -1,6 +1,6 @@
 import os
 import logging
-from math import radians, cos, sin, asin, sqrt
+import math
 from typing import List, Dict, Any, Tuple
 
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
@@ -231,11 +231,11 @@ def login_required(func):
     return wrapper
 
 def haversine(lat1, lon1, lat2, lon2):
-    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     dlat = lat2 - lat1
     dlon = lon2 - lon1
-    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
-    c = 2 * asin(sqrt(a))
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.asin(math.sqrt(a))
     return 6371 * c
 
 
@@ -484,33 +484,74 @@ def generate_procedural_itinerary(city_name, days):
         # Start with the place closest to top-left or city center?
         # Let's just pick the first in list as start, or the one with min latitude (most north?)
         
-        # Sort by latitude descending (North to South) as a simple heuristic for start
-        day_places_unsorted.sort(key=lambda x: x["lat"], reverse=True)
-        
-        logger.info(f"Day {d+1} Unsorted: {[p['name'] for p in day_places_unsorted]}")
+        # Optimization: TSP with 2-Opt Layout
+        # 1. Start with the northernmost point (simple heuristic)
+        # 2. Use Greedy Nearest Neighbor to build initial path
+        # 3. Refine with 2-Opt to remove crossovers
 
-        sorted_places = []
-        current = day_places_unsorted.pop(0) # Pick northernmost start
-        sorted_places.append(current)
-        
+        if not day_places_unsorted:
+            continue
+            
+        # Helper: Approximate distance in km (Equirectangular approximation)
+        def get_dist(p1, p2):
+            R = 6371  # Earth radius in km
+            lat1, lon1 = math.radians(p1["lat"]), math.radians(p1["lng"])
+            lat2, lon2 = math.radians(p2["lat"]), math.radians(p2["lng"])
+            x = (lon2 - lon1) * math.cos((lat1 + lat2) / 2)
+            y = lat2 - lat1
+            return R * math.sqrt(x*x + y*y)
+
+        # 1. Start North
+        day_places_unsorted.sort(key=lambda x: x["lat"], reverse=True)
+        current = day_places_unsorted.pop(0)
+        day_places = [current]
+
+        # 2. Greedy Nearest Neighbor
         while day_places_unsorted:
-            # Find closest to current
-            curr_lat, curr_lng = current["lat"], current["lng"]
-            
-            # Simple euclidean distance func for sorting
-            def dist_sq(p):
-                return (p["lat"] - curr_lat)**2 + (p["lng"] - curr_lng)**2
-            
-            # Get closest
-            nearest = min(day_places_unsorted, key=dist_sq)
-            
-            # Move to sorted
-            sorted_places.append(nearest)
+            nearest = min(day_places_unsorted, key=lambda p: get_dist(current, p))
+            day_places.append(nearest)
             day_places_unsorted.remove(nearest)
             current = nearest
+
+        # 3. 2-Opt Optimization (Refining the route)
+        # Swaps edges to remove crossings
+        def optimize_2opt(route):
+            best_route = route
+            # Calculate total distance of a route
+            def route_dist(r):
+                d = 0
+                for i in range(len(r)-1):
+                    d += get_dist(r[i], r[i+1])
+                return d
             
-        day_places = sorted_places
-        logger.info(f"Day {d+1} Sorted: {[p['name'] for p in day_places]}")
+            improved = True
+            best_dist = route_dist(route)
+            
+            # Limit iterations for performance
+            for _ in range(50): 
+                improved = False
+                for i in range(1, len(route) - 2):
+                    for j in range(i + 1, len(route)):
+                        if j - i == 1: continue
+                        
+                        # New route with swapped segment
+                        new_route = route[:]
+                        new_route[i:j] = route[j-1:i-1:-1] # Reverse segment
+                        
+                        new_dist = route_dist(new_route)
+                        if new_dist < best_dist:
+                            best_route = new_route
+                            best_dist = new_dist
+                            improved = True
+                            route = best_route
+                if not improved:
+                    break
+            return best_route
+
+        if len(day_places) > 3:
+            day_places = optimize_2opt(day_places)
+
+        logger.info(f"Day {d+1} Optimized: {[p['name'] for p in day_places]}")
 
         # Route Generation
         route = []
