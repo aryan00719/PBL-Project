@@ -249,7 +249,7 @@ def fallback_segment(o, d):
 
 GRAPH_CACHE = {}
 
-def get_city_graph(city_name):
+def get_city_graph(city_name, lat=None, lng=None):
     city_key = city_name.lower()
 
     # 1. In-memory cache (fastest)
@@ -266,7 +266,18 @@ def get_city_graph(city_name):
         G = ox.load_graphml(graph_path)
     else:
         logger.info(f"Downloading graph for {city_name}...")
-        G = ox.graph_from_place(city_name, network_type="drive")
+        
+        # Optimization: Use graph_from_point instead of graph_from_place
+        # graph_from_place uses complex polygon clipping which causes OOM on small servers (like Render free tier).
+        # graph_from_point with a radius is much lighter on memory.
+        if lat is not None and lng is not None:
+             logger.info(f"Using point-based download for {city_name} (15km radius)")
+             G = ox.graph_from_point((lat, lng), dist=15000, network_type="drive")
+        else:
+             # Fallback if no coords provided (shouldn't happen with updated logic)
+             logger.info(f"Using place-based download for {city_name}")
+             G = ox.graph_from_place(city_name, network_type="drive")
+
         # Ensure strongly connected to prevent routing errors
         G = ox.utils_graph.get_largest_component(G, strongly=True)
         ox.save_graphml(G, graph_path)
@@ -278,7 +289,7 @@ def get_city_graph(city_name):
 # Routing Engine
 # --------------------------------------------------
 
-def calculate_route(places: List[Dict[str, Any]], city_name: str) -> Tuple[List[List[float]], List[str]]:
+def calculate_route(places: List[Dict[str, Any]], city_name: str, city_lat: float = None, city_lng: float = None) -> Tuple[List[List[float]], List[str]]:
     """
     Returns:
     - full_route: List[[lat, lng]]  (single continuous polyline)
@@ -288,7 +299,7 @@ def calculate_route(places: List[Dict[str, Any]], city_name: str) -> Tuple[List[
         return [], []
 
     try:
-        G = get_city_graph(city_name)
+        G = get_city_graph(city_name, city_lat, city_lng)
     except Exception as e:
         logger.error(f"Failed to load graph: {e}")
         return [], []
@@ -506,7 +517,8 @@ def generate_procedural_itinerary(city_name, days):
         instructions = []
         
         try:
-             route, instructions = calculate_route(day_places, city.name)
+             # Pass city lat/lng to route calculator
+             route, instructions = calculate_route(day_places, city.name, city.lat, city.lng)
         except Exception as e:
              logger.error(f"Error calculating route for day {d+1}: {e}")
 
