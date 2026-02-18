@@ -249,7 +249,14 @@ def fallback_segment(o, d):
 
 GRAPH_CACHE = {}
 
+# CRITICAL SETTING: Disable graph download to prevent Server OOM (Out of Memory) crash
+# Set to True only if server has >1GB RAM
+ENABLE_ROUTING_GRAPH = False
+
 def get_city_graph(city_name, lat=None, lng=None):
+    if not ENABLE_ROUTING_GRAPH:
+        return None
+
     city_key = city_name.lower()
 
     # 1. In-memory cache (fastest)
@@ -295,14 +302,24 @@ def calculate_route(places: List[Dict[str, Any]], city_name: str, city_lat: floa
     - full_route: List[[lat, lng]]  (single continuous polyline)
     - instructions: List[str]
     """
-    if len(places) < 2:
-        return [], []
-
     try:
         G = get_city_graph(city_name, city_lat, city_lng)
     except Exception as e:
         logger.error(f"Failed to load graph: {e}")
-        return [], []
+        G = None
+
+    if G is None:
+        # Fallback: Straight lines (Lightweight Mode)
+        full_route = []
+        instructions = []
+        for i in range(len(places) - 1):
+            o, d = places[i], places[i+1]
+            full_route.extend([
+                [o["lat"], o["lng"]],
+                [d["lat"], d["lng"]]
+            ])
+            instructions.append(f"Travel to {d['name']} (Direct)")
+        return full_route, instructions
 
     full_route: List[List[float]] = []
     instructions: List[str] = []
