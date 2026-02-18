@@ -249,9 +249,15 @@ def fallback_segment(o, d):
 
 GRAPH_CACHE = {}
 
-# CRITICAL SETTING: Disable graph download to prevent Server OOM (Out of Memory) crash
-# Set to True only if server has >1GB RAM
-ENABLE_ROUTING_GRAPH = False
+# CRITICAL SETTING: Disable graph download on Render Free Tier to prevent OOM
+# Localhost (Mac) has plenty of RAM, so we enable it there.
+IS_RENDER = os.environ.get("RENDER", "False").lower() == "true"
+ENABLE_ROUTING_GRAPH = not IS_RENDER
+
+if not ENABLE_ROUTING_GRAPH:
+    logger.info("⚡️ RUNNING IN LIGHTWEIGHT MODE (Straight Lines) - Graph Download Disabled")
+else:
+    logger.info("🌍 RUNNING IN FULL MODE (Road Network) - Graph Download Enabled")
 
 def get_city_graph(city_name, lat=None, lng=None):
     if not ENABLE_ROUTING_GRAPH:
