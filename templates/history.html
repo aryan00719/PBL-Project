@@ -33,9 +33,9 @@
                 <a href="/planner" class="btn btn-primary shadow-md"><i class="fa-solid fa-plus"></i> New Trip</a>
             </div>
 
-            {% if history %}
+            {% if trips %}
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
-                {% for item in history %}
+                {% for item in trips %}
                 <div class="card trip-card hover:shadow-lg transition animate-slide-up"
                     data-delay="{{ (loop.index0 * 0.1)|round(1) }}">
 
@@ -57,26 +57,7 @@
                     </p>
 
                     <!-- Details Section (Timeline) -->
-                    <div id="details-{{ loop.index }}" class="mt-4 pt-4 border-t border-gray-100 hidden">
-                        <h4 class="text-xs font-bold text-muted uppercase tracking-wider mb-3">Itinerary Highlights</h4>
-                        {% if item.places %}
-                        <div class="timeline-list">
-                            {% for place in item.places[:3] %}
-                            <div class="timeline-item">
-                                <div class="text-sm font-medium">{{ place.name }}</div>
-                                <div class="text-xs text-muted">{{ place.category }}</div>
-                            </div>
-                            {% endfor %}
-                            {% if item.places|length > 3 %}
-                            <div class="timeline-item">
-                                <div class="text-xs text-muted italic">+ {{ item.places|length - 3 }} more stops</div>
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% else %}
-                        <p class="text-xs text-muted">No details available.</p>
-                        {% endif %}
-                    </div>
+
 
                     <!-- Footer Actions -->
                     <div class="card-footer">
@@ -85,9 +66,8 @@
                             <i class="fa-solid fa-map-show"></i> View Map
                         </a>
                         <button class="btn btn-secondary btn-sm flex-1 view-details-btn text-xs justify-center"
-                            onclick="toggleDetails('details-{{ loop.index }}')">
-                            <i class="fa-solid fa-list-timeline"></i> <span
-                                id="btn-text-{{ loop.index }}">Details</span>
+                            onclick="window.location.href='/planner?city={{ item.city }}&days={{ item.days }}'">
+                            <i class="fa-solid fa-rotate-right"></i> Generate Again
                         </button>
                     </div>
                 </div>
