@@ -633,41 +633,45 @@ def history():
 @app.route("/api/db-route", methods=["POST"])
 @login_required
 def db_route():
-    data = request.get_json()
-    city = data.get("city")
-    days = int(data.get("days", 3))
-
-    if not city:
-        return jsonify({"status": "error", "message": "City required"}), 400
-
     try:
+        data = request.get_json()
+        city = data.get("city")
+        days = int(data.get("days", 3))
+
+        if not city:
+            return jsonify({"status": "error", "message": "City required"}), 400
+
+        # Debug
+        logger.info(f"Generating itinerary for {city}, {days} days")
+
         itinerary = generate_procedural_itinerary(city, days)
+        
+        if not itinerary:
+            return jsonify({"status": "error", "message": "No data found for this city"}), 404
+
+        user_id = session.get("user_id")
+
+        # Ensure user exists in DB (important after DB migrations)
+        user = db.session.get(User, user_id) if user_id else None
+        if not user:
+            session.clear()
+            return jsonify({"status": "error", "message": "User session invalid. Please login again."}), 401
+
+        trip = Trip(city=city, days=days, user_id=user.id)
+        db.session.add(trip)
+        db.session.commit()
+
+        return jsonify({
+            "status": "success",
+            "city": itinerary["city"],
+            "days": itinerary["days"]
+        })
+
     except Exception as e:
-        logger.error(f"CRITICAL ERROR in itinerary gen: {e}")
+        logger.error(f"CRITICAL ERROR in db_route: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": f"Server crash: {str(e)}"}), 500
-
-    if not itinerary:
-        return jsonify({"status": "error", "message": "No data found for this city"}), 404
-
-    user_id = session.get("user_id")
-
-    # Ensure user exists in DB (important after DB migrations)
-    user = db.session.get(User, user_id) if user_id else None
-    if not user:
-        session.clear()
-        return jsonify({"status": "error", "message": "User session invalid. Please login again."}), 401
-
-    trip = Trip(city=city, days=days, user_id=user.id)
-    db.session.add(trip)
-    db.session.commit()
-
-    return jsonify({
-        "status": "success",
-        "city": itinerary["city"],
-        "days": itinerary["days"]
-    })
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
