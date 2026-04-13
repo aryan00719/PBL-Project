@@ -20,9 +20,15 @@
 
         .feature-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 30px;
             padding: 60px 0;
+        }
+
+        @media (max-width: 768px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .hero-title {
@@ -38,7 +44,7 @@
 </head>
 
 <body>
-    <div class="app-shell">
+    <div class="app-shell" style="overflow-y: auto;">
         <header class="app-header">
             <div class="header-brand">
                 <i class="fa-solid fa-route text-primary"></i>
