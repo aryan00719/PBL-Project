@@ -11,7 +11,7 @@
 </head>
 
 <body>
-    <div class="app-shell">
+    <div class="app-shell" style="overflow-y: auto;">
         <header class="app-header">
             <div class="header-brand">
                 <i class="fa-solid fa-route text-primary"></i>
@@ -34,44 +34,41 @@
             </div>
 
             {% if trips %}
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
-                {% for item in trips %}
-                <div class="card trip-card hover:shadow-lg transition animate-slide-up"
-                    data-delay="{{ (loop.index0 * 0.1)|round(1) }}">
-
-                    <!-- Card Header -->
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h3 class="text-xl text-primary font-bold mb-1">{{ item.city }}</h3>
-                            <div class="text-xs text-muted flex items-center gap-1">
-                                <i class="fa-regular fa-calendar"></i> {{ item.timestamp.split(' ')[0] if item.timestamp
-                                else 'Revent' }}
-                            </div>
-                        </div>
-                        <span class="badge badge-primary">{{ item.days }} Days</span>
-                    </div>
-
-                    <!-- Summary -->
-                    <p class="text-sm text-secondary mb-4">
-                        A {{ item.days }}-day trip exploring the best of {{ item.city }}.
-                    </p>
-
-                    <!-- Details Section (Timeline) -->
-
-
-                    <!-- Footer Actions -->
-                    <div class="card-footer">
-                        <a href="/planner?city={{ item.city }}&days={{ item.days }}"
-                            class="btn btn-primary btn-sm flex-1 text-xs justify-center">
-                            <i class="fa-solid fa-map-show"></i> View Map
-                        </a>
-                        <button class="btn btn-secondary btn-sm flex-1 view-details-btn text-xs justify-center"
-                            onclick="window.location.href='/planner?city={{ item.city }}&days={{ item.days }}'">
-                            <i class="fa-solid fa-rotate-right"></i> Generate Again
-                        </button>
-                    </div>
-                </div>
-                {% endfor %}
+            <div class="table-container" style="background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid var(--color-border); overflow: hidden; box-shadow: var(--shadow-sm);">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="background: var(--color-background); border-bottom: 1px solid var(--color-border);">
+                            <th style="padding: 16px 24px; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary);">Destination</th>
+                            <th style="padding: 16px 24px; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary);">Duration</th>
+                            <th style="padding: 16px 24px; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary);">Date Planned</th>
+                            <th style="padding: 16px 24px; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary); text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in trips %}
+                        <tr class="animate-slide-up" style="border-bottom: 1px solid var(--color-border); transition: background 0.2s;" data-delay="{{ (loop.index0 * 0.05)|round(2) }}" onmouseover="this.style.background='var(--color-surface-hover)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding: 16px 24px;">
+                                <div style="font-weight: 700; color: var(--color-primary); font-size: 1.1rem; text-transform: capitalize;">{{ item.city }}</div>
+                                <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 4px;">A focused trip exploring {{ item.city }}</div>
+                            </td>
+                            <td style="padding: 16px 24px;">
+                                <span class="badge badge-primary">{{ item.days }} Days</span>
+                            </td>
+                            <td style="padding: 16px 24px; font-size: 0.9rem; color: var(--color-text-muted);">
+                                <i class="fa-regular fa-calendar" style="margin-right: 4px;"></i> {{ item.created_at.strftime('%Y-%m-%d') if item.created_at else 'Recent' }}
+                            </td>
+                            <td style="padding: 16px 24px; text-align: right;">
+                                <a href="/planner?city={{ item.city }}&days={{ item.days }}" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-map-location-dot"></i> View Map
+                                </a>
+                                <button data-id="{{ item.id }}" onclick="deleteTrip(this.dataset.id)" class="btn btn-secondary btn-sm" style="color: var(--color-error); border-color: transparent; background: transparent; box-shadow: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;" title="Delete Trip">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
             {% else %}
             <div class="empty-state animate-slide-up">
@@ -98,6 +95,27 @@
                 el.classList.add('hidden');
             }
         }
+        
+        function deleteTrip(tripId) {
+            if (confirm("Are you sure you want to permanently delete this trip?")) {
+                fetch(`/api/delete-trip/${tripId}`, {
+                    method: 'DELETE',
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(data.message || "Failed to delete trip");
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Error deleting trip");
+                });
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
             document.querySelectorAll(".animate-slide-up").forEach(card => {
                 const delay = card.dataset.delay;

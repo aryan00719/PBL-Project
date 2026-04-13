@@ -7,13 +7,18 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
+import numpy as np
+
+# Fix for OSMnx crashing on NumPy 2.0+ (np.float_ was removed)
+if not hasattr(np, 'float_'):
+    np.float_ = np.float64
+
 import networkx as nx
 import osmnx as ox
 
 from datetime import datetime
 import math
 from random import shuffle
-import numpy as np
 from sklearn.cluster import KMeans
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -308,23 +313,31 @@ def calculate_route(places: List[Dict[str, Any]], city_name: str, city_lat: floa
     - full_route: List[[lat, lng]]  (single continuous polyline)
     - instructions: List[str]
     """
+    logger.info(f"Starting routing for {city_name} with {len(places)} places")
     try:
         G = get_city_graph(city_name, city_lat, city_lng)
+        if G is not None:
+             logger.info(f"Graph successfully loaded for {city_name}.")
+        else:
+             logger.warning(f"Graph is None for {city_name}.")
     except Exception as e:
         logger.error(f"Failed to load graph: {e}")
         G = None
 
     if G is None:
         # Fallback: Straight lines (Lightweight Mode)
+        logger.info("Using Haversine straight-line fallback for overall route.")
         full_route = []
         instructions = []
         for i in range(len(places) - 1):
             o, d = places[i], places[i+1]
-            full_route.extend([
-                [o["lat"], o["lng"]],
-                [d["lat"], d["lng"]]
-            ])
+            pt_o = [o["lat"], o["lng"]]
+            pt_d = [d["lat"], d["lng"]]
+            if not full_route or full_route[-1] != pt_o:
+                full_route.append(pt_o)
+            full_route.append(pt_d)
             instructions.append(f"Travel to {d['name']} (Direct)")
+        logger.info(f"Fallback complete. Continuous route points: {len(full_route)}")
         return full_route, instructions
 
     full_route: List[List[float]] = []
@@ -348,43 +361,39 @@ def calculate_route(places: List[Dict[str, Any]], city_name: str, city_lat: floa
                 continue
 
             for u, v in zip(path[:-1], path[1:]):
-                # Get edge data
                 edge_data = G.get_edge_data(u, v)
                 
-                # OSMnx graphs are MultiDiGraphs, so edge_data is a dictionary keyed by key (0, 1, etc.)
-                # applied usually 0 for the first edge
                 if edge_data:
-                    # Prefer lowest key (0) or any available
-                    data = edge_data[0]
+                    # MultiDiGraph yields a dict of edges between u and v keyed by edge key
+                    if isinstance(edge_data, dict):
+                        data = min(edge_data.values(), key=lambda d: d.get('length', float('inf')))
+                    else:
+                        data = edge_data
+
                     if "geometry" in data:
-                        # Extract geometry (LineString) checking for .coords or directly interacting
-                        # Shapely LineString.coords is list of (x, y) = (lng, lat)
-                        # We need [lat, lng]
-                        xs, ys = data["geometry"].xy
-                        for x, y in zip(xs, ys):
-                            segment_coords.append([y, x])
+                        for x, y in data["geometry"].coords:
+                            pt = [y, x] # Convert (lng, lat) to [lat, lng]
+                            if not segment_coords or segment_coords[-1] != pt:
+                                segment_coords.append(pt)
                     else:
                         # Fallback to straight line between nodes if no geometry
-                        # Node u
-                        segment_coords.append([G.nodes[u]["y"], G.nodes[u]["x"]])
-                        # Node v
-                        segment_coords.append([G.nodes[v]["y"], G.nodes[v]["x"]])
-            
-            # Ensure the last node coords are added if segment_coords is empty or for continuity
-            # But the loop above adds all points. We might have duplicates at seams.
+                        pt_u = [G.nodes[u]["y"], G.nodes[u]["x"]]
+                        pt_v = [G.nodes[v]["y"], G.nodes[v]["x"]]
+                        if not segment_coords or segment_coords[-1] != pt_u:
+                            segment_coords.append(pt_u)
+                        if not segment_coords or segment_coords[-1] != pt_v:
+                            segment_coords.append(pt_v)
             
             if not segment_coords:
-                 # Fallback if loop didn't run (shouldn't happen if path > 1)
-                 segment_coords = [[G.nodes[n]["y"], G.nodes[n]["x"]] for n in path]
+                 # Fallback if loop didn't run
+                 for n in path:
+                     pt = [G.nodes[n]["y"], G.nodes[n]["x"]]
+                     if not segment_coords or segment_coords[-1] != pt:
+                         segment_coords.append(pt)
 
-            # Append to full route
-            # Avoid duplicate points at connection (end of previous == start of current)
+            # Append to full route, avoiding duplicate points at junctions
             if full_route and segment_coords:
-                # Calculate distance between last of full_route and first of segment
-                # If very close, skip first of segment
-                last_pt = full_route[-1]
-                first_pt = segment_coords[0]
-                if last_pt == first_pt:
+                if full_route[-1] == segment_coords[0]:
                     full_route.extend(segment_coords[1:])
                 else:
                     full_route.extend(segment_coords)
@@ -394,15 +403,16 @@ def calculate_route(places: List[Dict[str, Any]], city_name: str, city_lat: floa
             instructions.append(f"Travel from {o['name']} to {d['name']}")
 
         except Exception as e:
-            logger.error(f"Routing failed between {o['name']} and {d['name']}: {e}")
-            # Fallback: Straight line
-            fallback = [[o["lat"], o["lng"]], [d["lat"], d["lng"]]]
-            if full_route:
-                full_route.extend(fallback[1:])
-            else:
-                full_route.extend(fallback)
+            logger.error(f"Routing failed between {o['name']} and {d['name']}: {e}. Triggering fallback for this segment.")
+            # Fallback: Straight line for this segment
+            pt_o = [o["lat"], o["lng"]]
+            pt_d = [d["lat"], d["lng"]]
+            if not full_route or full_route[-1] != pt_o:
+                full_route.append(pt_o)
+            full_route.append(pt_d)
             instructions.append(f"Travel to {d['name']} (Direct)")
 
+    logger.info(f"Routing complete. Total route points generated: {len(full_route)}")
     return full_route, instructions
 
 # --------------------------------------------------
@@ -652,6 +662,22 @@ def history():
                 .limit(10) \
                 .all()
     return render_template("history.html", trips=trips)
+
+@app.route("/api/delete-trip/<int:trip_id>", methods=["DELETE"])
+@login_required
+def delete_trip(trip_id):
+    try:
+        user_id = session.get("user_id")
+        trip = db.session.get(Trip, trip_id)
+        if not trip or trip.user_id != user_id:
+            return jsonify({"status": "error", "message": "Trip not found or unauthorized"}), 404
+            
+        db.session.delete(trip)
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Trip deleted."}), 200
+    except Exception as e:
+        logger.error(f"Error deleting trip {trip_id}: {e}")
+        return jsonify({"status": "error", "message": "Server error"}), 500
 
 @app.route("/api/db-route", methods=["POST"])
 @login_required
