@@ -19,6 +19,7 @@ instance/
 .DS_Store
 
 # Archived / old work
+archive/
 
 # Local testing artifacts
 cookies*.txt
