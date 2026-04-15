@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ city.name }} Sites | Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <style>
+        .admin-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .table-responsive { overflow-x: auto; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+        td { color: var(--text-secondary); vertical-align: middle; }
+        .site-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
+        .actions { display: flex; gap: 8px; }
+        .category-chip { background: var(--accent-color); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <div>
+                <a href="{{ url_for('admin_dashboard') }}" style="color: var(--accent-light); text-decoration: none;">← Back to Dashboard</a>
+                <h1 style="margin-top: 10px;">{{ city.name }}: Tourist Sites</h1>
+            </div>
+            <a href="{{ url_for('admin_add_site', city_id=city.id) }}" class="btn-primary" style="text-decoration: none;">+ Add Site</a>
+        </div>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Image</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Visit Time</th>
+                        <th>Coordinates</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for site in sites %}
+                    <tr>
+                        <td>
+                            {% if site.image_url %}
+                            <img src="{{ site.image_url }}" class="site-img" alt="{{ site.name }}">
+                            {% else %}
+                            <div class="site-img" style="background: var(--bg-primary); display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">No Image</div>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ site.name }}</strong></td>
+                        <td><span class="category-chip">{{ site.category or 'General' }}</span></td>
+                        <td>{{ site.visit_duration or '--' }}</td>
+                        <td>{{ site.latitude|round(4) }}, {{ site.longitude|round(4) }}</td>
+                        <td class="actions">
+                            <a href="{{ url_for('admin_edit_site', site_id=site.id) }}" class="btn-sm btn-secondary" style="text-decoration: none; padding: 6px 10px; font-size: 0.8rem;">Edit</a>
+                            <form action="{{ url_for('admin_delete_site', site_id=site.id) }}" method="POST" onsubmit="return confirm('Delete this place?');" style="display:inline;">
+                                <button type="submit" class="btn-sm" style="background: #ff4757; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Edit' if city else 'Add' }} City | Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <style>
+        .form-container { max-width: 600px; margin: 60px auto; padding: 30px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500; }
+        .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); }
+        .error-msg { background: #ff475722; color: #ff4757; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff475744; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>{{ 'Edit' if city else 'Add New' }} City</h1>
+        <p style="margin-bottom: 30px; color: var(--text-secondary);">Set the central coordinates for routing and map visualization.</p>
+
+        {% if error %}
+            <div class="error-msg">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="name">City Name</label>
+                <input type="text" id="name" name="name" value="{{ city.name if city else '' }}" placeholder="e.g. Jaipur" required>
+            </div>
+            <div class="form-group">
+                <label for="lat">Latitude (Global Center)</label>
+                <input type="number" step="any" id="lat" name="lat" value="{{ city.lat if city else '' }}" placeholder="26.9124" required>
+            </div>
+            <div class="form-group">
+                <label for="lng">Longitude (Global Center)</label>
+                <input type="number" step="any" id="lng" name="lng" value="{{ city.lng if city else '' }}" placeholder="75.7873" required>
+            </div>
+            
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button type="submit" class="btn-primary" style="flex: 1;">Save City</button>
+                <a href="{{ url_for('admin_dashboard') }}" class="btn-secondary" style="flex: 1; text-align: center; text-decoration: none; padding: 12px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

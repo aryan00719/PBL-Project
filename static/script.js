@@ -281,19 +281,76 @@ function renderRoutes(days) {
             icon: createCustomIcon(placeIdx + 1, color)
           }).addTo(map);
 
-          const popupContent = `
-                    <div style="min-width: 200px;">
-                        <h4 style="margin:0 0 5px 0; color:${color}; font-weight:700;">${place.name}</h4>
-                        <div style="font-size:12px; color:#555;">
-                            <p style="margin:2px 0;"><strong>Time:</strong> ${place.best_time_to_visit || "Daytime"}</p>
-                            <p style="margin:2px 0;"><strong>Ticket:</strong> ${place.ticket_price || "Free"}</p>
-                        </div>
-                    </div>
-                `;
+          // ── Build popup as a real DOM node so Leaflet's HTML sanitizer
+          //    (v1.9+) cannot strip class/style/onerror attributes ──────
+          const img      = place.image_url        ? place.image_url.trim()   : '';
+          const desc     = place.description      ? place.description.trim() : '';
+          const ticket   = place.ticket_price     || 'Free';
+          const bestTime = place.best_time_to_visit || 'Anytime';
+          const openHrs  = (place.opening_time && place.closing_time)
+                           ? `${place.opening_time} – ${place.closing_time}` : '';
+          const duration = place.visit_duration   || '';
 
-          marker.bindPopup(popupContent);
+          // Root card
+          const card = document.createElement('div');
+          card.className = 'ag-popup';
+
+          // Hero image
+          if (img) {
+            const imgWrap = document.createElement('div');
+            imgWrap.className = 'ag-popup-img-wrap';
+
+            const imgEl = document.createElement('img');
+            imgEl.className = 'ag-popup-img';
+            imgEl.src   = img;
+            imgEl.alt   = place.name;
+            imgEl.onerror = () => { imgWrap.style.display = 'none'; };
+
+            imgWrap.appendChild(imgEl);
+            card.appendChild(imgWrap);
+          }
+
+          // Body
+          const body = document.createElement('div');
+          body.className = 'ag-popup-body';
+
+          const title = document.createElement('h4');
+          title.className   = 'ag-popup-title';
+          title.style.color = color;
+          title.textContent = place.name;
+          body.appendChild(title);
+
+          if (desc) {
+            const p = document.createElement('p');
+            p.className   = 'ag-popup-desc';
+            p.textContent = desc;
+            body.appendChild(p);
+          }
+
+          // Info chips
+          const chips = document.createElement('div');
+          chips.className = 'ag-popup-chips';
+
+          const makeChip = (emoji, text) => {
+            const s = document.createElement('span');
+            s.className   = 'ag-chip';
+            s.textContent = `${emoji} ${text}`;
+            return s;
+          };
+
+          chips.appendChild(makeChip('🎟', ticket));
+          chips.appendChild(makeChip('⏰', bestTime));
+          if (openHrs)  chips.appendChild(makeChip('🕐', openHrs));
+          if (duration) chips.appendChild(makeChip('⏱', duration));
+
+          body.appendChild(chips);
+          card.appendChild(body);
+
+          // Bind the DOM node directly — bypasses Leaflet's sanitizer
+          marker.bindPopup(card, { maxWidth: 300, className: 'ag-leaflet-popup' });
           markers.push(marker);
           placeMarkerMap[place.name] = marker;
+
         }
       });
     }
@@ -337,6 +394,40 @@ function renderRoutes(days) {
       });
     }
   });
+
+    // --- FALLBACK: draw straight-line path for any places not covered by OSMnx routes ---
+    // This guarantees every day has a visible connection even when the graph fails.
+    days.forEach((day) => {
+      if (!Array.isArray(day.places) || day.places.length < 2) return;
+
+      const placeLatLngs = day.places.map(p => {
+        const lat = p.lat || p.latitude;
+        const lng = p.lng || p.longitude;
+        return (lat && lng) ? [lat, lng] : null;
+      }).filter(Boolean);
+
+      if (placeLatLngs.length < 2) return;
+
+      // Only draw the fallback dashes if the day has no OSMnx route at all
+      const hasRealRoute = Array.isArray(day.route) && day.route.length > 1;
+      if (!hasRealRoute) {
+        const dayIdx = days.indexOf(day);
+        const color = routeColors[dayIdx % routeColors.length];
+
+        // Dashed fallback line
+        const fallback = L.polyline(placeLatLngs, {
+          color: color,
+          weight: 3,
+          opacity: 0.7,
+          dashArray: '8 6',
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(map);
+        routeLayers.push(fallback);
+        placeLatLngs.forEach(pt => allLatLngs.push(pt));
+        anyRouteDrawn = true;
+      }
+    });
 
   if (anyRouteDrawn && allLatLngs.length > 0) {
     map.fitBounds(allLatLngs, { padding: [50, 50] });
@@ -383,7 +474,7 @@ function renderItinerary(days) {
 
       item.innerHTML = `
             <div class="place-name">${placeIdx + 1}. ${place.name}</div>
-            <div class="place-meta">${place.category || "Sightseeing"} • ${place.time_spent || "1h"}</div>
+            <div class="place-meta">${place.category || "Sightseeing"} • ${place.visit_duration || place.time_spent || "1h"}</div>
         `;
 
       item.addEventListener("mouseenter", () => {
@@ -409,10 +500,23 @@ function renderItinerary(days) {
       item.addEventListener("click", () => {
         const marker = placeMarkerMap[place.name];
         if (marker) {
-          map.setView(marker.getLatLng(), 15);
-          marker.openPopup();
-          // Mobile: close panel to see map
-          if (window.innerWidth < 768) toggleItineraryPanel(false);
+          // Collapse itinerary panel so the full map is visible
+          toggleItineraryPanel(false);
+
+          // Give the panel animation time to settle before panning
+          setTimeout(() => {
+            map.invalidateSize();
+
+            const latlng = marker.getLatLng();
+
+            // On desktop the left panel hides part of the map; compute an offset.
+            // panBy([x, y]) shifts the map in pixels — positive x moves map right (centering left-of-panel stay)
+            // After collapsing the panel the full viewport is available, so a direct flyTo works.
+            map.flyTo(latlng, 15, { animate: true, duration: 0.8 });
+
+            // Open popup slightly after the fly animation begins
+            setTimeout(() => marker.openPopup(), 850);
+          }, 320); // wait for panel collapse CSS transition (~300ms)
         }
       });
 

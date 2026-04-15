@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Edit' if site else 'Add' }} Site | Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <style>
+        .form-container { max-width: 900px; margin: 40px auto; padding: 30px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color); }
+        .form-header { margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group.full { grid-column: span 2; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500; font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { 
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); 
+            background: var(--bg-primary); color: var(--text-primary); 
+        }
+        .form-group textarea { height: 100px; resize: vertical; }
+        .btn-group { display: flex; gap: 15px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="form-header">
+            <a href="{{ url_for('admin_sites', city_id=city.id) }}" style="color: var(--accent-light); text-decoration: none;">← Back to {{ city.name }} List</a>
+            <h1 style="margin-top: 10px;">{{ 'Edit' if site else 'Add New' }} Place in {{ city.name }}</h1>
+        </div>
+
+        <form method="POST">
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label for="name">Place Name</label>
+                    <input type="text" id="name" name="name" value="{{ site.name if site else '' }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="number" step="any" id="latitude" name="latitude" value="{{ site.latitude if site else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="number" step="any" id="longitude" name="longitude" value="{{ site.longitude if site else '' }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="category">Category (e.g. Monument, Park, Temple)</label>
+                    <input type="text" id="category" name="category" value="{{ site.category if site else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="visit_duration">Avg. Visit Duration (e.g. 2 hours)</label>
+                    <input type="text" id="visit_duration" name="visit_duration" value="{{ site.visit_duration if site else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="opening_time">Opening Time (e.g. 9:00 AM)</label>
+                    <input type="text" id="opening_time" name="opening_time" value="{{ site.opening_time if site else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="closing_time">Closing Time (e.g. 6:00 PM)</label>
+                    <input type="text" id="closing_time" name="closing_time" value="{{ site.closing_time if site else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="ticket_price">Price Info (e.g. ₹50 / Free)</label>
+                    <input type="text" id="ticket_price" name="ticket_price" value="{{ site.ticket_price if site else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="best_time_to_visit">Best Time (e.g. Morning / Evening)</label>
+                    <input type="text" id="best_time_to_visit" name="best_time_to_visit" value="{{ site.best_time_to_visit if site else '' }}">
+                </div>
+
+                <div class="form-group full">
+                    <label for="image_url">Image URL</label>
+                    <input type="url" id="image_url" name="image_url" value="{{ site.image_url if site else '' }}" placeholder="https://...">
+                </div>
+
+                <div class="form-group full">
+                    <label for="description">Full Description</label>
+                    <textarea id="description" name="description">{{ site.description if site else '' }}</textarea>
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <button type="submit" class="btn-primary" style="flex: 2; padding: 12px;">Save Place Info</button>
+                <a href="{{ url_for('admin_sites', city_id=city.id) }}" class="btn-secondary" style="flex: 1; text-align: center; text-decoration: none; padding: 12px; line-height: 20px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

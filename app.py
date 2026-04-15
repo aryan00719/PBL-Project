@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import math
 from typing import List, Dict, Any, Tuple
@@ -131,10 +132,12 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
 
-    def __init__(self, email, password):
+    def __init__(self, email, password, is_admin=False):
         self.email = email
         self.password = password
+        self.is_admin = is_admin
 
 
 class Trip(db.Model):
@@ -155,73 +158,71 @@ class Trip(db.Model):
 
 
 def seed_data():
-    # 1. Ensure Cities Exist
-    jaipur = City.query.filter_by(name="Jaipur").first()
-    if not jaipur:
-        jaipur = City(name="Jaipur", lat=26.9124, lng=75.7873)
-        db.session.add(jaipur)
-        print("✅ Added city: Jaipur")
-
-    delhi = City.query.filter_by(name="Delhi").first()
-    if not delhi:
-        delhi = City(name="Delhi", lat=28.6139, lng=77.2090)
-        db.session.add(delhi)
-        print("✅ Added city: Delhi")
-
-    db.session.commit()
-
-    # 2. Define Sites Data
-    sites_data = [
-        # --- JAIPUR ---
-        {"city_id": jaipur.id, "name": "Hawa Mahal", "latitude": 26.9239, "longitude": 75.8267, "category": "Monument", "best_time_to_visit": "Morning"},
-        {"city_id": jaipur.id, "name": "Amer Fort", "latitude": 26.9855, "longitude": 75.8513, "category": "Fort", "best_time_to_visit": "Morning"},
-        {"city_id": jaipur.id, "name": "City Palace", "latitude": 26.9258, "longitude": 75.8237, "category": "Palace", "best_time_to_visit": "Afternoon"},
-        {"city_id": jaipur.id, "name": "Jal Mahal", "latitude": 26.9535, "longitude": 75.8462, "category": "Lake Palace", "best_time_to_visit": "Evening"},
-        {"city_id": jaipur.id, "name": "Nahargarh Fort", "latitude": 26.9368, "longitude": 75.8160, "category": "Fort", "best_time_to_visit": "Evening"},
-        {"city_id": jaipur.id, "name": "Albert Hall Museum", "latitude": 26.9124, "longitude": 75.8196, "category": "Museum", "best_time_to_visit": "Afternoon"},
-        {"city_id": jaipur.id, "name": "Jantar Mantar", "latitude": 26.9248, "longitude": 75.8246, "category": "Observatory", "best_time_to_visit": "Morning"},
-        
-        # --- DELHI ---
-        {"city_id": delhi.id, "name": "India Gate", "latitude": 28.6129, "longitude": 77.2295, "category": "Monument", "best_time_to_visit": "Evening", "visit_duration": "1-2 hours", "ticket_price": "Free", "opening_time": "24 hours", "closing_time": "24 hours"},
-        {"city_id": delhi.id, "name": "Red Fort", "latitude": 28.6562, "longitude": 77.2410, "category": "Historical Fort", "best_time_to_visit": "Morning", "visit_duration": "2-3 hours", "ticket_price": "₹35 / ₹500", "opening_time": "9:30 AM", "closing_time": "4:30 PM"},
-        {"city_id": delhi.id, "name": "Qutub Minar", "latitude": 28.5244, "longitude": 77.1855, "category": "Historical Monument", "best_time_to_visit": "Morning", "visit_duration": "1-2 hours", "ticket_price": "₹40 / ₹600", "opening_time": "7:00 AM", "closing_time": "5:00 PM"},
-        {"city_id": delhi.id, "name": "Humayun’s Tomb", "latitude": 28.5933, "longitude": 77.2507, "category": "Historical Monument", "best_time_to_visit": "Afternoon", "visit_duration": "1-2 hours", "ticket_price": "₹40 / ₹600", "opening_time": "6:00 AM", "closing_time": "6:00 PM"},
-        {"city_id": delhi.id, "name": "Lotus Temple", "latitude": 28.5535, "longitude": 77.2588, "category": "Religious Site", "best_time_to_visit": "Evening", "visit_duration": "1 hour", "ticket_price": "Free", "opening_time": "9:00 AM", "closing_time": "5:00 PM"},
-        {"city_id": delhi.id, "name": "Connaught Place", "latitude": 28.6315, "longitude": 77.2167, "category": "Market", "best_time_to_visit": "Evening", "visit_duration": "2-3 hours", "ticket_price": "Free", "opening_time": "10:00 AM", "closing_time": "10:00 PM"},
-        {"city_id": delhi.id, "name": "Jama Masjid", "latitude": 28.6507, "longitude": 77.2334, "category": "Religious Site", "best_time_to_visit": "Morning", "visit_duration": "1 hour", "ticket_price": "Free", "opening_time": "7:00 AM", "closing_time": "5:00 PM"},
-        {"city_id": delhi.id, "name": "Akshardham Temple", "latitude": 28.6127, "longitude": 77.2773, "category": "Temple", "best_time_to_visit": "Evening", "visit_duration": "3-4 hours", "ticket_price": "Free", "opening_time": "10:00 AM", "closing_time": "8:00 PM"},
-        {"city_id": delhi.id, "name": "Rashtrapati Bhavan", "latitude": 28.6143, "longitude": 77.1994, "category": "Landmark", "best_time_to_visit": "Morning", "visit_duration": "1 hour", "ticket_price": "₹50", "opening_time": "9:00 AM", "closing_time": "4:00 PM"}
+    """
+    Ensures the six supported cities exist in the database.
+    If the database is empty, it auto-seeds from data/initial_data.json.
+    """
+    CITIES = [
+        {"name": "Jaipur",    "lat": 26.9124, "lng": 75.7873},
+        {"name": "Delhi",     "lat": 28.6139, "lng": 77.2090},
+        {"name": "Mumbai",    "lat": 19.0760, "lng": 72.8777},
+        {"name": "Agra",      "lat": 27.1767, "lng": 78.0081},
+        {"name": "Udaipur",   "lat": 24.5854, "lng": 73.7125},
+        {"name": "Bangalore", "lat": 12.9716, "lng": 77.5946},
     ]
 
-    # 3. Add Sites if Missing
-    added_sites = 0
-    for s_data in sites_data:
-        existing = Site.query.filter_by(name=s_data["name"], city_id=s_data["city_id"]).first()
-        if not existing:
-            site = Site(
-                city_id=s_data["city_id"],
-                name=s_data["name"],
-                latitude=s_data["latitude"],
-                longitude=s_data["longitude"],
-                category=s_data.get("category"),
-                best_time_to_visit=s_data.get("best_time_to_visit"),
-                visit_duration=s_data.get("visit_duration"),
-                ticket_price=s_data.get("ticket_price"),
-                opening_time=s_data.get("opening_time"),
-                closing_time=s_data.get("closing_time")
-            )
-            db.session.add(site)
-            added_sites += 1
+    # Seed Cities
+    for c_data in CITIES:
+        if not City.query.filter_by(name=c_data["name"]).first():
+            db.session.add(City(name=c_data["name"], lat=c_data["lat"], lng=c_data["lng"]))
+    db.session.commit()
+
+    # Seed Sites from JSON if empty
+    if Site.query.count() == 0:
+        json_path = os.path.join(os.path.dirname(__file__), "data", "initial_data.json")
+        if os.path.exists(json_path):
+            print("🚀 DB empty. Seeding initial tourist sites from JSON...")
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    places_data = json.load(f)
+                
+                sites_added = 0
+                for city_name, sites in places_data.items():
+                    city_obj = City.query.filter_by(name=city_name).first()
+                    if not city_obj: continue
+                    
+                    for s in sites:
+                        new_site = Site(
+                            city_id=city_obj.id,
+                            name=s["name"],
+                            latitude=s["latitude"],
+                            longitude=s["longitude"],
+                            category=s.get("category"),
+                            opening_time=s.get("opening_time"),
+                            closing_time=s.get("closing_time"),
+                            visit_duration=s.get("visit_duration"),
+                            best_time_to_visit=s.get("best_time_to_visit"),
+                            ticket_price=s.get("ticket_price"),
+                            description=s.get("description"),
+                            image_url=s.get("image_url")
+                        )
+                        db.session.add(new_site)
+                        sites_added += 1
+                
+                db.session.commit()
+                print(f"✅ Auto-seeded {sites_added} initial site(s).")
+            except Exception as e:
+                print(f"❌ Failed to seed from JSON: {e}")
+        else:
+            print("⚠️  No tourist sites found and 'data/initial_data.json' is missing.")
     
-    if added_sites > 0:
-        db.session.commit()
-        print(f"✅ Added {added_sites} new sites.")
-    else:
-        print("ℹ️ All sites already exist.")
+    print(f"ℹ️  DB status: {City.query.count()} cities, {Site.query.count()} sites.")
 
 with app.app_context():
     db.create_all()
     seed_data()
+
+
 
 # --------------------------------------------------
 # Utilities
@@ -264,7 +265,23 @@ if not ENABLE_ROUTING_GRAPH:
 else:
     logger.info("🌍 RUNNING IN FULL MODE (Road Network) - Graph Download Enabled")
 
-def get_city_graph(city_name, lat=None, lng=None):
+# Use OSMnx HTTP cache to avoid re-downloading the same road tiles
+if ENABLE_ROUTING_GRAPH:
+    try:
+        ox.settings.use_cache = True
+        ox.settings.log_console = False
+    except Exception:
+        pass
+
+
+
+
+def get_city_graph(city_name: str, places: list = None, city_lat: float = None, city_lng: float = None):
+    """
+    Download (or load from cache) a road-network graph that covers all
+    the given places.  Uses a tight bounding-box download so the graph
+    is as small as possible while still including every waypoint.
+    """
     if not ENABLE_ROUTING_GRAPH:
         return None
 
@@ -280,28 +297,84 @@ def get_city_graph(city_name, lat=None, lng=None):
     graph_path = os.path.join(cache_dir, f"{city_key}.graphml")
 
     if os.path.exists(graph_path):
-        logger.info(f"Loading graph for {city_name} from disk...")
+        logger.info(f"Loading graph for {city_name} from disk cache...")
         G = ox.load_graphml(graph_path)
+        GRAPH_CACHE[city_key] = G
+        return G
+
+    # 3. Fresh download — compute center+radius from places bounding box
+    #    Uses graph_from_point (more compatible than graph_from_bbox across OSMnx versions).
+    logger.info(f"Downloading road graph for {city_name}...")
+
+    BUFFER_M = 5000   # 5 km padding beyond the outermost place
+
+    if places and len(places) >= 1:
+        lats = [p["lat"] for p in places]
+        lngs = [p["lng"] for p in places]
+        center_lat = (max(lats) + min(lats)) / 2
+        center_lng = (max(lngs) + min(lngs)) / 2
+
+        # Straight-line distance from centre to a corner, converted to metres
+        half_diag_m = haversine(
+            center_lat, center_lng,
+            max(lats), max(lngs)
+        ) * 1000
+
+        radius = int(half_diag_m + BUFFER_M)
+        radius = min(max(radius, 8000), 80000)   # clamp: 8 km – 80 km
+
+        logger.info(f"Point-based download for {city_name}: centre ({center_lat:.4f},{center_lng:.4f}), radius={radius}m")
+        G = ox.graph_from_point((center_lat, center_lng), dist=radius, network_type="drive")
+    elif city_lat is not None and city_lng is not None:
+        logger.info(f"Point-based download for {city_name} (15 km fallback radius)")
+        G = ox.graph_from_point((city_lat, city_lng), dist=15000, network_type="drive")
     else:
-        logger.info(f"Downloading graph for {city_name}...")
-        
-        # Optimization: Use graph_from_point instead of graph_from_place
-        # graph_from_place uses complex polygon clipping which causes OOM on small servers (like Render free tier).
-        # graph_from_point with a radius is much lighter on memory.
-        if lat is not None and lng is not None:
-             logger.info(f"Using point-based download for {city_name} (6km radius)")
-             G = ox.graph_from_point((lat, lng), dist=6000, network_type="drive")
-        else:
-             # Fallback if no coords provided (shouldn't happen with updated logic)
-             logger.info(f"Using place-based download for {city_name}")
-             G = ox.graph_from_place(city_name, network_type="drive")
+        logger.info(f"Place-based download for {city_name}")
+        G = ox.graph_from_place(city_name, network_type="drive")
 
-        # Ensure strongly connected to prevent routing errors
-        G = ox.utils_graph.get_largest_component(G, strongly=True)
-        ox.save_graphml(G, graph_path)
-
+    G = ox.utils_graph.get_largest_component(G, strongly=True)
+    ox.save_graphml(G, graph_path)
     GRAPH_CACHE[city_key] = G
+    logger.info(f"Graph for {city_name} saved ({len(G.nodes)} nodes).")
     return G
+
+
+def _preload_graphs_background():
+    """Pre-download road graphs for all supported cities at startup.
+    Runs in a daemon thread so it doesn't block the server from starting.
+    City-centre coordinates are used here (not place-level bbox),
+    so the graphs cover the main urban area.  Individual routes may
+    trigger a bbox-based re-download if it covers a wider area.
+    """
+    from app import app, db, City, Site  # local import to avoid circular import
+    try:
+        with app.app_context():
+            cities = City.query.all()
+            for city in cities:
+                city_key = city.name.lower()
+                if city_key in GRAPH_CACHE:
+                    continue
+                graph_path = os.path.join("graph_cache", f"{city_key}.graphml")
+                if os.path.exists(graph_path):
+                    logger.info(f"[BG] Graph already on disk for {city.name}, skipping.")
+                    continue
+                try:
+                    # Fetch all sites for this city to get the real bbox
+                    sites = Site.query.filter_by(city_id=city.id).all()
+                    place_list = [{"lat": s.latitude, "lng": s.longitude} for s in sites if s.latitude and s.longitude]
+                    logger.info(f"[BG] Pre-downloading graph for {city.name} ({len(place_list)} sites)...")
+                    get_city_graph(city.name, places=place_list, city_lat=city.lat, city_lng=city.lng)
+                    logger.info(f"[BG] Graph ready for {city.name}.")
+                except Exception as e:
+                    logger.error(f"[BG] Failed to pre-download graph for {city.name}: {e}")
+    except Exception as e:
+        logger.error(f"[BG] Pre-load thread error: {e}")
+
+# Start background graph pre-loader only on the main process (not the Werkzeug reloader child)
+if ENABLE_ROUTING_GRAPH and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+    import threading
+    threading.Thread(target=_preload_graphs_background, daemon=True, name="GraphPreloader").start()
+    logger.info("🗺 Background graph pre-loader started.")
 
 # --------------------------------------------------
 # Routing Engine
@@ -315,7 +388,7 @@ def calculate_route(places: List[Dict[str, Any]], city_name: str, city_lat: floa
     """
     logger.info(f"Starting routing for {city_name} with {len(places)} places")
     try:
-        G = get_city_graph(city_name, city_lat, city_lng)
+        G = get_city_graph(city_name, places=places, city_lat=city_lat, city_lng=city_lng)
         if G is not None:
              logger.info(f"Graph successfully loaded for {city_name}.")
         else:
@@ -470,15 +543,17 @@ def generate_procedural_itinerary(city_name, days):
             "closing_time": s.closing_time,
             "ticket_price": s.ticket_price,
             "best_time_to_visit": s.best_time_to_visit,
-            "visit_duration": s.visit_duration
+            "visit_duration": s.visit_duration,
+            "description": s.description,
+            "image_url": s.image_url
         } for s in sites
     ]
 
     if days <= 0:
         days = 1
 
-    # For demo: allow max 3 days
-    days = min(days, 3)
+    # Cap: can't plan more days than available places (KMeans requires n_clusters ≤ n_samples)
+    # The natural limit is applied below via num_days = min(days, len(sites_data))
 
     # Clustering Logic
     coordinates = np.array([[s["lat"], s["lng"]] for s in sites_data])
@@ -756,8 +831,150 @@ def register():
 
         return redirect(url_for("login"))
 
+
     return render_template("register.html")
 
+
+# ===========================================================
+# ADMIN PANEL
+# ===========================================================
+
+def admin_required(func):
+    """Decorator: requires logged-in user with is_admin=True."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        user_id = session.get("user_id")
+        if not user_id:
+            return redirect(url_for("login"))
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return "⛔ Admin access required.", 403
+        return func(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/admin")
+@admin_required
+def admin_dashboard():
+    cities = City.query.order_by(City.name).all()
+    total_sites = Site.query.count()
+    return render_template("admin/dashboard.html", cities=cities, total_sites=total_sites)
+
+
+@app.route("/admin/cities/add", methods=["GET", "POST"])
+@admin_required
+def admin_add_city():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        lat  = request.form.get("lat",  type=float)
+        lng  = request.form.get("lng",  type=float)
+        if not name or lat is None or lng is None:
+            return render_template("admin/city_form.html", error="All fields are required.", city=None)
+        if City.query.filter_by(name=name).first():
+            return render_template("admin/city_form.html", error=f"City '{name}' already exists.", city=None)
+        db.session.add(City(name=name, lat=lat, lng=lng))
+        db.session.commit()
+        return redirect(url_for("admin_dashboard"))
+    return render_template("admin/city_form.html", city=None, error=None)
+
+
+@app.route("/admin/cities/<int:city_id>/edit", methods=["GET", "POST"])
+@admin_required
+def admin_edit_city(city_id):
+    city = db.session.get(City, city_id)
+    if not city:
+        return "City not found", 404
+    if request.method == "POST":
+        city.name = request.form.get("name", city.name).strip()
+        city.lat  = request.form.get("lat",  type=float) or city.lat
+        city.lng  = request.form.get("lng",  type=float) or city.lng
+        db.session.commit()
+        return redirect(url_for("admin_dashboard"))
+    return render_template("admin/city_form.html", city=city, error=None)
+
+
+@app.route("/admin/cities/<int:city_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_city(city_id):
+    city = db.session.get(City, city_id)
+    if city:
+        Site.query.filter_by(city_id=city_id).delete()
+        db.session.delete(city)
+        db.session.commit()
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/cities/<int:city_id>/sites")
+@admin_required
+def admin_sites(city_id):
+    city  = db.session.get(City, city_id)
+    if not city:
+        return "City not found", 404
+    sites = Site.query.filter_by(city_id=city_id).order_by(Site.name).all()
+    return render_template("admin/sites.html", city=city, sites=sites)
+
+
+@app.route("/admin/cities/<int:city_id>/sites/add", methods=["GET", "POST"])
+@admin_required
+def admin_add_site(city_id):
+    city = db.session.get(City, city_id)
+    if not city:
+        return "City not found", 404
+    if request.method == "POST":
+        f = request.form
+        site = Site(
+            city_id=city_id,
+            name=f.get("name","").strip(),
+            latitude=float(f.get("latitude") or 0),
+            longitude=float(f.get("longitude") or 0),
+            category=f.get("category","").strip() or None,
+            opening_time=f.get("opening_time","").strip() or None,
+            closing_time=f.get("closing_time","").strip() or None,
+            visit_duration=f.get("visit_duration","").strip() or None,
+            ticket_price=f.get("ticket_price","").strip() or None,
+            best_time_to_visit=f.get("best_time_to_visit","").strip() or None,
+            description=f.get("description","").strip() or None,
+            image_url=f.get("image_url","").strip() or None,
+        )
+        db.session.add(site)
+        db.session.commit()
+        return redirect(url_for("admin_sites", city_id=city_id))
+    return render_template("admin/site_form.html", city=city, site=None, error=None)
+
+
+@app.route("/admin/sites/<int:site_id>/edit", methods=["GET", "POST"])
+@admin_required
+def admin_edit_site(site_id):
+    site = db.session.get(Site, site_id)
+    if not site:
+        return "Site not found", 404
+    if request.method == "POST":
+        site.name             = request.form.get("name", site.name).strip()
+        site.latitude         = float(request.form.get("latitude") or site.latitude)
+        site.longitude        = float(request.form.get("longitude") or site.longitude)
+        site.category         = request.form.get("category","").strip() or site.category
+        site.opening_time     = request.form.get("opening_time","").strip() or site.opening_time
+        site.closing_time     = request.form.get("closing_time","").strip() or site.closing_time
+        site.visit_duration   = request.form.get("visit_duration","").strip() or site.visit_duration
+        site.ticket_price     = request.form.get("ticket_price","").strip() or site.ticket_price
+        site.best_time_to_visit = request.form.get("best_time_to_visit","").strip() or site.best_time_to_visit
+        site.description      = request.form.get("description","").strip() or site.description
+        site.image_url        = request.form.get("image_url","").strip() or site.image_url
+        db.session.commit()
+        return redirect(url_for("admin_sites", city_id=site.city_id))
+    return render_template("admin/site_form.html", city=site.city, site=site, error=None)
+
+
+@app.route("/admin/sites/<int:site_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_site(site_id):
+    site = db.session.get(Site, site_id)
+    if site:
+        city_id = site.city_id
+        db.session.delete(site)
+        db.session.commit()
+        return redirect(url_for("admin_sites", city_id=city_id))
+    return redirect(url_for("admin_dashboard"))
 
 
 

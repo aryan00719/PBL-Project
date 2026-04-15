@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Travel Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <style>
+        .admin-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .city-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .city-card { 
+            background: var(--bg-secondary); 
+            border-radius: 12px; 
+            padding: 20px; 
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+        .city-card:hover { transform: translateY(-5px); }
+        .city-card h3 { margin-top: 0; color: var(--text-primary); }
+        .city-stats { color: var(--text-secondary); font-size: 0.9rem; margin: 10px 0; }
+        .city-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-sm { padding: 8px 12px; font-size: 0.85rem; border-radius: 6px; }
+        .bg-danger { background: #ff4757; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <div>
+                <h1>Admin Dashboard</h1>
+                <p>Welcome, Administrator. You are managing <strong>{{ total_sites }}</strong> sites across <strong>{{ cities|length }}</strong> cities.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('admin_add_city') }}" class="btn-primary" style="text-decoration: none;">+ Add City</a>
+                <a href="{{ url_for('home') }}" class="btn-secondary" style="text-decoration: none;">View Site</a>
+            </div>
+        </div>
+
+        <div class="city-grid">
+            {% for city in cities %}
+            <div class="city-card">
+                <h3>{{ city.name }}</h3>
+                <div class="city-stats">
+                    <p>📍 {{ city.lat }}, {{ city.lng }}</p>
+                    <p>🏛️ {{ city.sites|length }} Tourist Places</p>
+                </div>
+                <div class="city-actions">
+                    <a href="{{ url_for('admin_sites', city_id=city.id) }}" class="btn-sm btn-primary" style="text-decoration: none;">Manage Sites</a>
+                    <a href="{{ url_for('admin_edit_city', city_id=city.id) }}" class="btn-sm btn-secondary" style="text-decoration: none;">Edit</a>
+                    <form action="{{ url_for('admin_delete_city', city_id=city.id) }}" method="POST" onsubmit="return confirm('Delete this city and ALL its sites?');">
+                        <button type="submit" class="btn-sm bg-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
