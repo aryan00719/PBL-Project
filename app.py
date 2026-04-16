@@ -222,38 +222,45 @@ def seed_data():
 def sync_db_schema():
     """
     Check if required columns exist (like is_admin) and add them if missing.
-    Matches the syntax for both SQLite (local) and Postgres (production).
+    SQLAlchemy 2.0 compliant version with explicit commits.
     """
-    bind = db.engine.connect()
-    
-    # 1. Ensure 'users' table has 'is_admin'
     try:
-        # Check if the column already exists
-        bind.execute(text("SELECT is_admin FROM users LIMIT 1"))
-        logger.info("✅ Database schema sync: 'is_admin' column present.")
-    except Exception:
-        # If it fails, add the column
-        logger.warning("🛠 Database schema sync: Adding missing 'is_admin' column...")
-        try:
-            # Postgres syntax
-            if "postgresql" in str(db.engine.url):
-                bind.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
-            else:
-                # SQLite syntax
-                bind.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
-            db.session.commit()
-            logger.info("✅ 'is_admin' column added successfully.")
-        except Exception as e:
-            logger.error(f"❌ Failed to sync schema: {e}")
-    finally:
-        bind.close()
+        with db.engine.connect() as conn:
+            # 1. Ensure 'users' table has 'is_admin'
+            try:
+                # Check if the column already exists
+                conn.execute(text("SELECT is_admin FROM users LIMIT 1"))
+            except Exception:
+                # If it fails, add the column
+                logger.warning("🛠 Database schema sync: Adding missing 'is_admin' column...")
+                try:
+                    # Postgres vs SQLite syntax
+                    if "postgresql" in str(db.engine.url).lower():
+                        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
+                    else:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+                    conn.commit()
+                    logger.info("✅ 'is_admin' column added successfully.")
+                except Exception as e:
+                    logger.error(f"❌ Failed to add column: {e}")
+    except Exception as e:
+        logger.error(f"❌ Schema sync connection failed: {e}")
 
+# --------------------------------------------------
+# Startup Initialization (Robust / Non-Blocking)
+# --------------------------------------------------
 with app.app_context():
-    db.create_all()
-    # Ensure schema is synced (adds new columns to existing tables)
-    sync_db_schema()
-    # Seeding
-    seed_data()
+    try:
+        logger.info("🚀 Starting database initialization...")
+        db.create_all()
+        # Ensure schema is synced (adds new columns to existing tables)
+        sync_db_schema()
+        # Seeding
+        seed_data()
+        logger.info("✅ Database initialization complete.")
+    except Exception as e:
+        logger.error(f"❌ CRITICAL: Database initialization failed: {e}")
+        logger.info("⚠️  Continuing server launch anyway (Manual DB fix may be required).")
 
 
 
