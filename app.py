@@ -221,28 +221,36 @@ def seed_data():
 
 def sync_db_schema():
     """
-    Check if required columns exist (like is_admin) and add them if missing.
-    SQLAlchemy 2.0 compliant version with explicit commits.
+    Check if required columns exist and add them if missing.
+    Specifically handles Postgres 'poisoned transactions' by performing
+    a rollback before attempting an ALTER TABLE.
     """
     try:
         with db.engine.connect() as conn:
-            # 1. Ensure 'users' table has 'is_admin'
-            try:
-                # Check if the column already exists
-                conn.execute(text("SELECT is_admin FROM users LIMIT 1"))
-            except Exception:
-                # If it fails, add the column
-                logger.warning("🛠 Database schema sync: Adding missing 'is_admin' column...")
+            is_postgres = "postgresql" in str(db.engine.url).lower()
+            
+            def ensure_column(table_name, col_name, sql_type):
                 try:
-                    # Postgres vs SQLite syntax
-                    if "postgresql" in str(db.engine.url).lower():
-                        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
-                    else:
-                        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
-                    conn.commit()
-                    logger.info("✅ 'is_admin' column added successfully.")
-                except Exception as e:
-                    logger.error(f"❌ Failed to add column: {e}")
+                    conn.execute(text(f"SELECT {col_name} FROM {table_name} LIMIT 1"))
+                except Exception:
+                    if is_postgres:
+                        conn.rollback()
+                    logger.warning(f"🛠 Syncing {table_name}: Adding missing '{col_name}' column...")
+                    try:
+                        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {sql_type}"))
+                        conn.commit()
+                        logger.info(f"✅ Column '{col_name}' added to {table_name}.")
+                    except Exception as e:
+                        logger.error(f"❌ Failed to add '{col_name}' to {table_name}: {e}")
+
+            # Sync User table
+            bool_type = "BOOLEAN DEFAULT FALSE" if is_postgres else "BOOLEAN DEFAULT 0"
+            ensure_column("users", "is_admin", bool_type)
+
+            # Sync Site table (ensure newest features are present in Prod)
+            ensure_column("sites", "description", "TEXT")
+            ensure_column("sites", "image_url", "VARCHAR(255)")
+            
     except Exception as e:
         logger.error(f"❌ Schema sync connection failed: {e}")
 
