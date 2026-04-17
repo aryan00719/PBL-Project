@@ -178,21 +178,21 @@ def seed_data():
             db.session.add(City(name=c_data["name"], lat=c_data["lat"], lng=c_data["lng"]))
     db.session.commit()
 
-    # Seed Sites from JSON if empty
-    if Site.query.count() == 0:
-        json_path = os.path.join(os.path.dirname(__file__), "data", "initial_data.json")
-        if os.path.exists(json_path):
-            print("🚀 DB empty. Seeding initial tourist sites from JSON...")
-            try:
-                with open(json_path, "r", encoding="utf-8") as f:
-                    places_data = json.load(f)
+    # Seed Sites from JSON (Idempotent: adds missing sites)
+    json_path = os.path.join(os.path.dirname(__file__), "data", "initial_data.json")
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                places_data = json.load(f)
+            
+            sites_added = 0
+            for city_name, sites in places_data.items():
+                city_obj = City.query.filter_by(name=city_name).first()
+                if not city_obj: continue
                 
-                sites_added = 0
-                for city_name, sites in places_data.items():
-                    city_obj = City.query.filter_by(name=city_name).first()
-                    if not city_obj: continue
-                    
-                    for s in sites:
+                for s in sites:
+                    # Check if this exact site already exists
+                    if not Site.query.filter_by(city_id=city_obj.id, name=s["name"]).first():
                         new_site = Site(
                             city_id=city_obj.id,
                             name=s["name"],
@@ -209,13 +209,14 @@ def seed_data():
                         )
                         db.session.add(new_site)
                         sites_added += 1
-                
+            
+            if sites_added > 0:
                 db.session.commit()
-                print(f"✅ Auto-seeded {sites_added} initial site(s).")
-            except Exception as e:
-                print(f"❌ Failed to seed from JSON: {e}")
-        else:
-            print("⚠️  No tourist sites found and 'data/initial_data.json' is missing.")
+                print(f"✅ Auto-seeded {sites_added} missing site(s).")
+        except Exception as e:
+            print(f"❌ Failed to seed from JSON: {e}")
+    else:
+        print("⚠️  No 'data/initial_data.json' found. Skip seeding.")
     
     print(f"ℹ️  DB status: {City.query.count()} cities, {Site.query.count()} sites.")
 
@@ -248,8 +249,8 @@ def sync_db_schema():
             ensure_column("users", "is_admin", bool_type)
 
             # Sync Site table (ensure newest features are present in Prod)
-            ensure_column("sites", "description", "TEXT")
-            ensure_column("sites", "image_url", "VARCHAR(255)")
+            ensure_column("site", "description", "TEXT")
+            ensure_column("site", "image_url", "VARCHAR(255)")
             
     except Exception as e:
         logger.error(f"❌ Schema sync connection failed: {e}")
