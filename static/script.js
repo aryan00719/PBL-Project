@@ -480,7 +480,9 @@ function renderItinerary(days) {
               </div>
               <button class="btn btn-ghost btn-sm dropdown-trigger" style="padding: 0 8px;"><i class="fa-solid fa-chevron-down"></i></button>
           </div>
-          <div class="place-details hidden" style="font-size: 0.83rem; color: var(--text-muted); margin-top: 8px; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.03); display: none;">
+          <div class="place-details hidden" style="font-size: 0.83rem; color: var(--text-muted); margin-top: 8px; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.03);">
+              ${place.image_url ? `<img src="${place.image_url}" alt="${place.name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;">` : ''}
+              ${place.description ? `<p style="margin-bottom: 8px; font-style: italic;">${place.description}</p>` : ''}
               <div style="margin-bottom: 4px;"><strong>Category:</strong> ${place.category || 'N/A'}</div>
               <div style="margin-bottom: 4px;"><strong>Best Time:</strong> ${place.best_time_to_visit || 'Anytime'}</div>
               <div style="margin-bottom: 4px;"><strong>Hours:</strong> ${(place.opening_time && place.closing_time) ? `${place.opening_time} - ${place.closing_time}` : 'Varies'}</div>
@@ -494,11 +496,11 @@ function renderItinerary(days) {
 
       dropdownBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          if (detailsDiv.style.display === "none") {
-              detailsDiv.style.display = "block";
+          if (detailsDiv.classList.contains("hidden")) {
+              detailsDiv.classList.remove("hidden");
               dropdownBtn.innerHTML = '<i class="fa-solid fa-chevron-up"></i>';
           } else {
-              detailsDiv.style.display = "none";
+              detailsDiv.classList.add("hidden");
               dropdownBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
           }
       });
