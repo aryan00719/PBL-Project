@@ -346,8 +346,11 @@ function renderRoutes(days) {
           body.appendChild(chips);
           card.appendChild(body);
 
-          // Bind the DOM node directly — bypasses Leaflet's sanitizer
-          marker.bindPopup(card, { maxWidth: 300, className: 'ag-leaflet-popup' });
+          // Bind using an explicit L.popup instance wrapping the DOM node
+          // This prevents DOM detachment issues on repetitive clicks
+          const popup = L.popup({ maxWidth: 300, className: 'ag-leaflet-popup' }).setContent(card);
+          marker.bindPopup(popup);
+          
           markers.push(marker);
           placeMarkerMap[place.name] = marker;
 
@@ -440,7 +443,6 @@ function renderItinerary(days) {
   const container = document.getElementById("itinerary");
   if (!container) return;
 
-  // Crucial: Clear container first
   container.innerHTML = "";
 
   days.forEach((day, idx) => {
@@ -452,7 +454,6 @@ function renderItinerary(days) {
     // Header
     const header = document.createElement("div");
     header.className = "day-header";
-    // Check if day.day already has "Day" prefix
     const dayLabel = day.day.toString().toLowerCase().startsWith("day") ? day.day : `Day ${day.day}`;
 
     header.innerHTML = `
@@ -467,57 +468,100 @@ function renderItinerary(days) {
     day.places.forEach((place, placeIdx) => {
       const item = document.createElement("div");
       item.className = "place-item";
-
-      // CSS trick for strict coloring of the dot using variable not fully supported inline easily without style attr
-      // We'll use border-left instead for easy visualization or custom style
+      item.id = `itinerary-${place.name.replace(/\W+/g, '-')}`;
       item.style.borderLeft = `3px solid transparent`;
+      item.style.transition = "background-color 0.2s, border-left-color 0.2s";
 
       item.innerHTML = `
-            <div class="place-name">${placeIdx + 1}. ${place.name}</div>
-            <div class="place-meta">${place.category || "Sightseeing"} • ${place.visit_duration || place.time_spent || "1h"}</div>
-        `;
+          <div class="place-header" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+              <div>
+                  <div class="place-name">${placeIdx + 1}. ${place.name}</div>
+                  <div class="place-meta">${place.category || "Sightseeing"} • ${place.visit_duration || place.time_spent || "1h"}</div>
+              </div>
+              <button class="btn btn-ghost btn-sm dropdown-trigger" style="padding: 0 8px;"><i class="fa-solid fa-chevron-down"></i></button>
+          </div>
+          <div class="place-details hidden" style="font-size: 0.83rem; color: var(--text-muted); margin-top: 8px; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.03); display: none;">
+              <div style="margin-bottom: 4px;"><strong>Category:</strong> ${place.category || 'N/A'}</div>
+              <div style="margin-bottom: 4px;"><strong>Best Time:</strong> ${place.best_time_to_visit || 'Anytime'}</div>
+              <div style="margin-bottom: 4px;"><strong>Hours:</strong> ${(place.opening_time && place.closing_time) ? `${place.opening_time} - ${place.closing_time}` : 'Varies'}</div>
+              <div><strong>Ticket:</strong> ${place.ticket_price || 'Free'}</div>
+          </div>
+      `;
 
+      const headerDiv = item.querySelector('.place-header');
+      const dropdownBtn = item.querySelector('.dropdown-trigger');
+      const detailsDiv = item.querySelector('.place-details');
+
+      dropdownBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (detailsDiv.style.display === "none") {
+              detailsDiv.style.display = "block";
+              dropdownBtn.innerHTML = '<i class="fa-solid fa-chevron-up"></i>';
+          } else {
+              detailsDiv.style.display = "none";
+              dropdownBtn.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+          }
+      });
+
+      const marker = placeMarkerMap[place.name];
+
+      // Setup Two-Way Sync Logic on Marker Click
+      if (marker) {
+          marker.on('click', () => {
+              // Center map smoothly to zoom 14 instead of jumping wildly
+              map.flyTo(marker.getLatLng(), 14, { animate: true, duration: 0.8 });
+
+              // Reset global iteration highlights
+              document.querySelectorAll('.place-item').forEach(el => {
+                  el.style.borderLeftColor = 'transparent';
+                  el.style.backgroundColor = '';
+              });
+
+              // Highlight specific item
+              item.style.borderLeftColor = dayColor;
+              item.style.backgroundColor = "var(--color-surface-hover)";
+
+              // Scroll to it if the panel is open
+              const panel = document.getElementById("itinerary-panel");
+              if (panel && !panel.classList.contains("collapsed")) {
+                  item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }
+          });
+      }
+
+      // Handle hover highlight for map interaction
       item.addEventListener("mouseenter", () => {
-        item.style.borderLeftColor = dayColor;
-        item.style.backgroundColor = "var(--color-surface-hover)";
-        // Highlight marker
-        const marker = placeMarkerMap[place.name];
-        if (marker) {
-          marker.setOpacity(1);
-          marker._icon.style.transform += " scale(1.2)";
-        }
+          if (item.style.backgroundColor !== "var(--color-surface-hover)") {
+              item.style.borderLeftColor = dayColor;
+          }
+          if (marker) {
+              marker.setOpacity(1);
+              marker._icon.style.transform += " scale(1.2)";
+          }
       });
 
       item.addEventListener("mouseleave", () => {
-        item.style.borderLeftColor = "transparent";
-        item.style.backgroundColor = "";
-        const marker = placeMarkerMap[place.name];
-        if (marker) {
-          marker._icon.style.transform = marker._icon.style.transform.replace(" scale(1.2)", "");
-        }
+          // If not currently "active" via click, reset border
+          if (item.style.backgroundColor !== "var(--color-surface-hover)") {
+              item.style.borderLeftColor = "transparent";
+          }
+          if (marker) {
+              marker._icon.style.transform = marker._icon.style.transform.replace(" scale(1.2)", "");
+          }
       });
 
-      item.addEventListener("click", () => {
-        const marker = placeMarkerMap[place.name];
-        if (marker) {
-          // Collapse itinerary panel so the full map is visible
-          toggleItineraryPanel(false);
-
-          // Give the panel animation time to settle before panning
-          setTimeout(() => {
-            map.invalidateSize();
-
-            const latlng = marker.getLatLng();
-
-            // On desktop the left panel hides part of the map; compute an offset.
-            // panBy([x, y]) shifts the map in pixels — positive x moves map right (centering left-of-panel stay)
-            // After collapsing the panel the full viewport is available, so a direct flyTo works.
-            map.flyTo(latlng, 15, { animate: true, duration: 0.8 });
-
-            // Open popup slightly after the fly animation begins
-            setTimeout(() => marker.openPopup(), 850);
-          }, 320); // wait for panel collapse CSS transition (~300ms)
-        }
+      // Handle card click to focus map
+      headerDiv.addEventListener("click", () => {
+          if (marker) {
+              if (window.innerWidth < 768) {
+                  toggleItineraryPanel(false);
+              }
+              // Fire the marker's click event so we get identical behavior (highlight + center)
+              setTimeout(() => {
+                  marker.fire('click');
+                  marker.openPopup(); // Ensure popup opens
+              }, window.innerWidth < 768 ? 320 : 0);
+          }
       });
 
       placeList.appendChild(item);
