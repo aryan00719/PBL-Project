@@ -48,11 +48,21 @@
         <header class="app-header">
             <div class="header-brand">
                 <i class="fa-solid fa-route text-primary"></i>
-                <span>RouteWise</span>
+                {% if session.get('user_id') %}
+                <a href="/home" style="text-decoration: none; color: inherit;">RouteWise</a>
+                {% else %}
+                <a href="/" style="text-decoration: none; color: inherit;">RouteWise</a>
+                {% endif %}
             </div>
             <nav class="header-nav">
+                {% if session.get('user_id') %}
+                <a href="/planner" class="btn btn-ghost text-primary">Planner</a>
+                <a href="/history" class="btn btn-ghost">History</a>
+                <a href="/logout" class="btn btn-ghost text-xs" style="color: var(--color-error);">Logout</a>
+                {% else %}
                 <a href="/login" class="btn btn-ghost">Login</a>
                 <a href="/register" class="btn btn-primary">Sign Up</a>
+                {% endif %}
             </nav>
         </header>
 
@@ -64,9 +74,13 @@
                     Smart itineraries giving you the best routes, times, and prices for your next adventure.
                 </p>
                 <div class="flex justify-center gap-4">
-                    <a href="/register" class="btn btn-primary" style="padding: 12px 32px; font-size: 1.1rem;">Get
-                        Started Free</a>
+                    {% if session.get('user_id') %}
+                    <a href="/home" class="btn btn-primary" style="padding: 12px 32px; font-size: 1.1rem;">Go to Dashboard</a>
+                    <a href="/planner" class="btn btn-secondary" style="padding: 12px 32px; font-size: 1.1rem;">Start Planning</a>
+                    {% else %}
+                    <a href="/register" class="btn btn-primary" style="padding: 12px 32px; font-size: 1.1rem;">Get Started Free</a>
                     <a href="/login" class="btn btn-secondary" style="padding: 12px 32px; font-size: 1.1rem;">Login</a>
+                    {% endif %}
                 </div>
             </div>
         </section>
