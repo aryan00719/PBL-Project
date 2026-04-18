@@ -192,7 +192,8 @@ def seed_data():
                 
                 for s in sites:
                     # Check if this exact site already exists
-                    if not Site.query.filter_by(city_id=city_obj.id, name=s["name"]).first():
+                    existing_site = Site.query.filter_by(city_id=city_obj.id, name=s["name"]).first()
+                    if not existing_site:
                         new_site = Site(
                             city_id=city_obj.id,
                             name=s["name"],
@@ -209,10 +210,20 @@ def seed_data():
                         )
                         db.session.add(new_site)
                         sites_added += 1
-            
+                    else:
+                        # Update existing site with new data if available and different
+                        updated = False
+                        fields_to_update = ["latitude", "longitude", "category", "opening_time", "closing_time", "visit_duration", "best_time_to_visit", "ticket_price", "description", "image_url"]
+                        for field in fields_to_update:
+                            if s.get(field) is not None and getattr(existing_site, field) != s.get(field):
+                                setattr(existing_site, field, s.get(field))
+                                updated = True
+                        if updated:
+                            sites_added += 1
+
             if sites_added > 0:
                 db.session.commit()
-                print(f"✅ Auto-seeded {sites_added} missing site(s).")
+                print(f"✅ Auto-seeded/updated {sites_added} site(s).")
         except Exception as e:
             print(f"❌ Failed to seed from JSON: {e}")
     else:
