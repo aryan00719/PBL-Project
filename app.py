@@ -2,9 +2,10 @@ import os
 import json
 import logging
 import math
+import re
 from typing import List, Dict, Any, Tuple
 
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from flask_cors import CORS
@@ -48,7 +49,7 @@ else:
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "routewise-secret-key-v2")
 
 db = SQLAlchemy(app)
 
@@ -131,11 +132,14 @@ class User(db.Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def __init__(self, email, password, is_admin=False):
+    def __init__(self, username, email, password, is_admin=False):
+        self.username = username
         self.email = email
         self.password = password
         self.is_admin = is_admin
@@ -258,6 +262,19 @@ def sync_db_schema():
             # Sync User table
             bool_type = "BOOLEAN DEFAULT FALSE" if is_postgres else "BOOLEAN DEFAULT 0"
             ensure_column("users", "is_admin", bool_type)
+            # Make sure we add username as a nullable column first using VARCHAR, then backfill
+            ensure_column("users", "username", "VARCHAR(80)")
+            ensure_column("users", "created_at", "DATETIME")
+
+            # Backfill any null usernames with a safe generated default based on their ID
+            try:
+                conn.execute(text("UPDATE users SET username = 'user_' || id WHERE username IS NULL"))
+                conn.execute(text("UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL"))
+                conn.commit()
+            except Exception as e:
+                if is_postgres:
+                    conn.rollback()
+                logger.error(f"❌ Failed to backfill generic usernames: {e}")
 
             # Sync Site table (ensure newest features are present in Prod)
             ensure_column("site", "description", "TEXT")
@@ -860,16 +877,23 @@ def db_route():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email")
+        login_id = request.form.get("email") # Re-using same form name for simplicity, but template should call it login_id or email
         password = request.form.get("password")
 
-        user = User.query.filter_by(email=email).first()
+        # Determine if email or username was provided
+        if "@" in login_id:
+            user = User.query.filter_by(email=login_id).first()
+        else:
+            user = User.query.filter_by(username=login_id).first()
 
         if user and check_password_hash(user.password, password):
+            session.clear() # Securely reset session to prevent fixation
             session["user_id"] = user.id
+            session.permanent = True # Enables persistence based on app config
             return redirect(url_for("home"))
-
-        return "Invalid credentials"
+            
+        flash("Invalid username/email or password.", "error")
+        return redirect(url_for("login"))
 
     return render_template("login.html")
 
@@ -877,20 +901,42 @@ def login():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
 
-        existing = User.query.filter_by(email=email).first()
-        if existing:
-            return "User already exists"
+        # Strict Validation
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            flash("Invalid email format.", "error")
+            return redirect(url_for("register"))
+            
+        if len(password) < 6:
+            flash("Password must be at least 6 characters long.", "error")
+            return redirect(url_for("register"))
+            
+        if len(username) < 3:
+            flash("Username must be at least 3 characters long.", "error")
+            return redirect(url_for("register"))
+            
+        if not re.match(r"^[a-zA-Z0-9_]+$", username):
+            flash("Username can only contain alphanumeric characters and underscores.", "error")
+            return redirect(url_for("register"))
+
+        if User.query.filter_by(email=email).first():
+            flash("Email is already safely registered.", "error")
+            return redirect(url_for("register"))
+            
+        if User.query.filter_by(username=username).first():
+            flash("Username is already taken.", "error")
+            return redirect(url_for("register"))
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
-        new_user = User(email=email, password=hashed_password)
+        new_user = User(username=username, email=email, password=hashed_password)
         db.session.add(new_user)
         db.session.commit()
-
+        
+        flash("Registration successful! Please log in.", "success")
         return redirect(url_for("login"))
-
 
     return render_template("register.html")
 
