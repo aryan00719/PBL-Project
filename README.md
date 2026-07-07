@@ -2,12 +2,9 @@
 
 ## Overview
 
-This project is a database-driven travel itinerary planner that generates
-structured, multi-day travel plans for a city and visualizes optimized routes
-on an interactive map.
+This project is a database-driven travel itinerary planner that generates structured, multi-day travel plans for a city and visualizes optimized routes on an interactive map.
 
-Unlike AI-generated systems, this application follows a **procedural,
-deterministic approach**, ensuring reproducible and explainable outputs.
+Unlike AI-generated systems, this application follows a **procedural, deterministic approach**, ensuring reproducible and explainable outputs.
 
 This version (v2.0) additionally includes user authentication, session-based access control, dynamic time-based location ordering, and improved route visualization with merged polylines for smoother navigation rendering.
 
